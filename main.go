@@ -26,6 +26,7 @@ var statLock sync.Mutex
 var topShow *int
 var refreshSec *int
 var absoluteItemTime *bool
+var whole *bool
 
 func printTopValues() {
 	displayRecord := make(map[string]time.Time)
@@ -79,6 +80,7 @@ func main() {
 	topShow = flag.Int("n", 10, "Show top N values")
 	refreshSec = flag.Int("r", 5, "Refresh interval in seconds")
 	absoluteItemTime = flag.Bool("absolute", false, "Show absolute time for each item")
+	whole = flag.Bool("whole", false, "Analyze whole log file and then tail it")
 	flag.Parse()
 
 	var filename string
@@ -93,13 +95,23 @@ func main() {
 	reqStats = make(map[string]int)
 	lastURL = make(map[string]string)
 	lastURLUpdateDate = make(map[string]time.Time)
-	t, err := tail.TailFile(filename, tail.Config{
-		Follow: true,
-		ReOpen: true,
-		Location: &tail.SeekInfo{
+
+	var seekInfo *tail.SeekInfo
+	if *whole {
+		seekInfo = &tail.SeekInfo{
+			Offset: 0,
+			Whence: io.SeekStart,
+		}
+	} else {
+		seekInfo = &tail.SeekInfo{
 			Offset: -1024 * 1024,
 			Whence: io.SeekEnd,
-		},
+		}
+	}
+	t, err := tail.TailFile(filename, tail.Config{
+		Follow:        true,
+		ReOpen:        true,
+		Location:      seekInfo,
 		CompleteLines: true,
 	})
 	if err != nil {
@@ -107,8 +119,10 @@ func main() {
 	}
 	go printTopValues()
 
-	// Eat a line from t.Lines, as first line may be incomplete
-	<-t.Lines
+	if !*whole {
+		// Eat a line from t.Lines, as first line may be incomplete
+		<-t.Lines
+	}
 
 	for line := range t.Lines {
 		var logItem map[string]any
