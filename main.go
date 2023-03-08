@@ -2,11 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"log"
 	"math"
 	"net/netip"
+	"os"
 	"sort"
 	"sync"
 	"time"
@@ -21,9 +23,14 @@ var lastURL map[string]string
 var lastURLUpdateDate map[string]time.Time
 var statLock sync.Mutex
 
+var topShow *int
+var refreshSec *int
+var absoluteItemTime *bool
+
 func printTopValues() {
+	displayRecord := make(map[string]time.Time)
 	for {
-		time.Sleep(5 * time.Second)
+		time.Sleep(time.Duration(*refreshSec) * time.Second)
 		// sort stats key by value
 		var keys []string
 		statLock.Lock()
@@ -33,9 +40,9 @@ func printTopValues() {
 		sort.Slice(keys, func(i, j int) bool {
 			return sizeStats[keys[i]] > sizeStats[keys[j]]
 		})
-		// print top 10
-		top := 10
-		if len(keys) < 10 {
+		// print top N
+		top := *topShow
+		if len(keys) < *topShow {
 			top = len(keys)
 		}
 		for i := 0; i < top; i++ {
@@ -43,10 +50,25 @@ func printTopValues() {
 			total := sizeStats[key]
 			reqTotal := reqStats[key]
 			last := lastURL[key]
-			lastTime := lastURLUpdateDate[key].Format("2006-01-02 15:04:05")
+
+			var lastTime string
+			if *absoluteItemTime {
+				lastTime = lastURLUpdateDate[key].Format("2006-01-02 15:04:05")
+			} else {
+				lastTime = humanize.Time(lastURLUpdateDate[key])
+			}
 
 			average := total / uint64(reqTotal)
-			log.Printf("%s: %s %d %s %s (%s)\n", key, humanize.Bytes(total), reqTotal, humanize.Bytes(average), last, lastTime)
+
+			fmtStart := ""
+			fmtEnd := ""
+			if displayRecord[key] != lastURLUpdateDate[key] {
+				// display this line in bold
+				fmtStart = "\u001b[1m"
+				fmtEnd = "\u001b[22m"
+			}
+			log.Printf("%s%s: %s %d %s %s (%s)%s\n", fmtStart, key, humanize.Bytes(total), reqTotal, humanize.Bytes(average), last, lastTime, fmtEnd)
+			displayRecord[key] = lastURLUpdateDate[key]
 		}
 		fmt.Println()
 		statLock.Unlock()
@@ -54,11 +76,24 @@ func printTopValues() {
 }
 
 func main() {
+	topShow = flag.Int("n", 10, "Show top N values")
+	refreshSec = flag.Int("r", 5, "Refresh interval in seconds")
+	absoluteItemTime = flag.Bool("absolute", false, "Show absolute time for each item")
+	flag.Parse()
+
+	var filename string
+	if len(flag.Args()) == 1 {
+		filename = flag.Args()[0]
+	} else {
+		filename = "/var/log/nginx/mirrors/access_json.log"
+	}
+	fmt.Fprintln(os.Stderr, "Using log file:", filename)
+
 	sizeStats = make(map[string]uint64)
 	reqStats = make(map[string]int)
 	lastURL = make(map[string]string)
 	lastURLUpdateDate = make(map[string]time.Time)
-	t, err := tail.TailFile("/var/log/nginx/mirrors/access_json.log", tail.Config{
+	t, err := tail.TailFile(filename, tail.Config{
 		Follow: true,
 		ReOpen: true,
 		Location: &tail.SeekInfo{
