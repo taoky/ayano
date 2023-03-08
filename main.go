@@ -32,7 +32,13 @@ func printTopValues() {
 		})
 		// print top 10
 		for i := 0; i < 10; i++ {
-			log.Printf("%s: %s %d %s\n", keys[i], humanize.Bytes(sizeStats[keys[i]]), reqStats[keys[i]], lastURL[keys[i]])
+			key := keys[i]
+			total := sizeStats[key]
+			reqTotal := reqStats[key]
+			last := lastURL[key]
+
+			average := total / uint64(reqTotal)
+			log.Printf("%s: %s %d %s %s\n", key, humanize.Bytes(total), reqTotal, humanize.Bytes(average), last)
 		}
 		fmt.Println()
 		statLock.Unlock()
