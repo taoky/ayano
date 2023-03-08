@@ -15,6 +15,7 @@ import (
 
 var sizeStats map[string]uint64
 var reqStats map[string]int
+var lastURL map[string]string
 var statLock sync.Mutex
 
 func printTopValues() {
@@ -31,7 +32,7 @@ func printTopValues() {
 		})
 		// print top 10
 		for i := 0; i < 10; i++ {
-			log.Printf("%s: %s %d\n", keys[i], humanize.Bytes(sizeStats[keys[i]]), reqStats[keys[i]])
+			log.Printf("%s: %s %d %s\n", keys[i], humanize.Bytes(sizeStats[keys[i]]), reqStats[keys[i]], lastURL[keys[i]])
 		}
 		fmt.Println()
 		statLock.Unlock()
@@ -41,6 +42,7 @@ func printTopValues() {
 func main() {
 	sizeStats = make(map[string]uint64)
 	reqStats = make(map[string]int)
+	lastURL = make(map[string]string)
 	t, err := tail.TailFile("/var/log/nginx/mirrors/access_json.log", tail.Config{
 		Follow: true,
 		ReOpen: true,
@@ -83,6 +85,7 @@ func main() {
 		} else {
 			reqStats[clientPrefix.String()] = 1
 		}
+		lastURL[clientPrefix.String()] = logItem["url"].(string)
 		statLock.Unlock()
 	}
 }
