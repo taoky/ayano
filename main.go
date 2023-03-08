@@ -74,6 +74,7 @@ func main() {
 		} else {
 			clientPrefix = netip.PrefixFrom(clientip, 48)
 		}
+		clientPrefix = clientPrefix.Masked()
 		statLock.Lock()
 		if _, ok := sizeStats[clientPrefix.String()]; ok {
 			sizeStats[clientPrefix.String()] += size
