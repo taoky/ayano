@@ -1,18 +1,19 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"log"
-	"math"
 	"net/netip"
 	"os"
 	"sort"
 	"sync"
 	"time"
 
+	. "github.com/taoky/ayano/parser"
+
+	"github.com/cakturk/go-netstat/netstat"
 	"github.com/dustin/go-humanize"
 	"github.com/nxadm/tail"
 )
@@ -27,11 +28,49 @@ var topShow *int
 var refreshSec *int
 var absoluteItemTime *bool
 var whole *bool
+var noNetstat *bool
+var parser *string
+
+var boldStart = "\u001b[1m"
+var boldEnd = "\u001b[22m"
 
 func printTopValues() {
 	displayRecord := make(map[string]time.Time)
 	for {
 		time.Sleep(time.Duration(*refreshSec) * time.Second)
+		activeConn := make(map[string]bool)
+		if !*noNetstat {
+			// Get active connections
+			tabs, err := netstat.TCPSocks(func(s *netstat.SockTabEntry) bool {
+				return s.State == netstat.Established
+			})
+			if err != nil {
+				log.Printf("netstat error: %v", err)
+			} else {
+				for _, tab := range tabs {
+					ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
+					if !ok {
+						continue
+					}
+					activeConn[getIPPrefixString(ip)] = true
+				}
+			}
+			tabs, err = netstat.TCP6Socks(func(s *netstat.SockTabEntry) bool {
+				return s.State == netstat.Established
+			})
+			if err != nil {
+				log.Printf("netstat error: %v", err)
+			} else {
+				for _, tab := range tabs {
+					ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
+					if !ok {
+						continue
+					}
+					activeConn[getIPPrefixString(ip)] = true
+				}
+			}
+		}
+
 		// sort stats key by value
 		var keys []string
 		statLock.Lock()
@@ -63,12 +102,26 @@ func printTopValues() {
 
 			fmtStart := ""
 			fmtEnd := ""
+			connection := ""
+
+			boldLine := false
 			if displayRecord[key] != lastURLUpdateDate[key] {
 				// display this line in bold
-				fmtStart = "\u001b[1m"
-				fmtEnd = "\u001b[22m"
+				fmtStart = boldStart
+				fmtEnd = boldEnd
+				boldLine = true
 			}
-			log.Printf("%s%s: %s %d %s %s (%s)%s\n", fmtStart, key, humanize.Bytes(total), reqTotal, humanize.Bytes(average), last, lastTime, fmtEnd)
+			if !*noNetstat {
+				if _, ok := activeConn[key]; ok {
+					if !boldLine {
+						connection = fmt.Sprintf("%s%s%s", boldStart, " (active)", boldEnd)
+					} else {
+						connection = " (active)"
+					}
+				}
+			}
+			log.Printf("%s%s%s: %s %d %s %s (%s)%s\n", fmtStart, key, connection, humanize.Bytes(total), reqTotal,
+				humanize.Bytes(average), last, lastTime, fmtEnd)
 			displayRecord[key] = lastURLUpdateDate[key]
 		}
 		fmt.Println()
@@ -76,12 +129,29 @@ func printTopValues() {
 	}
 }
 
+func getIPPrefixString(ip netip.Addr) string {
+	var clientPrefix netip.Prefix
+	if ip.Is4() {
+		clientPrefix = netip.PrefixFrom(ip, 24)
+	} else {
+		clientPrefix = netip.PrefixFrom(ip, 48)
+	}
+	clientPrefix = clientPrefix.Masked()
+	return clientPrefix.String()
+}
+
 func main() {
 	topShow = flag.Int("n", 10, "Show top N values")
 	refreshSec = flag.Int("r", 5, "Refresh interval in seconds")
 	absoluteItemTime = flag.Bool("absolute", false, "Show absolute time for each item")
 	whole = flag.Bool("whole", false, "Analyze whole log file and then tail it")
+	noNetstat = flag.Bool("no-netstat", false, "Do not detect active connections")
+	parser = flag.String("parser", "nginx-json", "Parser to use (nginx-json or nginx-combined)")
 	flag.Parse()
+
+	if *parser != "nginx-json" && *parser != "nginx-combined" {
+		log.Fatal("Invalid parser")
+	}
 
 	var filename string
 	if len(flag.Args()) == 1 {
@@ -125,46 +195,40 @@ func main() {
 	}
 
 	for line := range t.Lines {
-		var logItem map[string]any
-		err := json.Unmarshal([]byte(line.Text), &logItem)
+		var logItem LogItem
+		var err error
+		if *parser == "nginx-json" {
+			var parser NginxJSONParser
+			logItem, err = parser.Parse(line.Text)
+		} else if *parser == "nginx-combined" {
+			var parser NginxCombinedParser
+			logItem, err = parser.Parse(line.Text)
+		}
 		if err != nil {
-			log.Printf("json unmarshal error: %v\n", err)
+			log.Printf("parse error: %v\n", err)
 			log.Printf("got line: %s\n", line.Text)
 			continue
 		}
-		size := uint64(logItem["size"].(float64))
+		size := logItem.Size
 		if size <= 100000000 {
 			continue
 		}
-		clientip_str := logItem["clientip"].(string)
+		clientip_str := logItem.Client
 		clientip, err := netip.ParseAddr(clientip_str)
 		if err != nil {
 			log.Printf("parse ip error: %v\n", err)
 			continue
 		}
-		var clientPrefix netip.Prefix
-		if clientip.Is4() {
-			clientPrefix = netip.PrefixFrom(clientip, 24)
-		} else {
-			clientPrefix = netip.PrefixFrom(clientip, 48)
-		}
-		clientPrefix = clientPrefix.Masked()
+		clientPrefixString := getIPPrefixString(clientip)
 		statLock.Lock()
-		if _, ok := sizeStats[clientPrefix.String()]; ok {
-			sizeStats[clientPrefix.String()] += size
-		} else {
-			sizeStats[clientPrefix.String()] = size
-		}
-		if _, ok := reqStats[clientPrefix.String()]; ok {
-			reqStats[clientPrefix.String()] += 1
-		} else {
-			reqStats[clientPrefix.String()] = 1
-		}
-		url := logItem["url"].(string)
-		if url != lastURL[clientPrefix.String()] {
-			lastURL[clientPrefix.String()] = url
-			sec, dec := math.Modf(logItem["timestamp"].(float64))
-			lastURLUpdateDate[clientPrefix.String()] = time.Unix(int64(sec), int64(dec*1e9))
+
+		sizeStats[clientPrefixString] += size
+		reqStats[clientPrefixString] += 1
+
+		url := logItem.URL
+		if url != lastURL[clientPrefixString] {
+			lastURL[clientPrefixString] = url
+			lastURLUpdateDate[clientPrefixString] = logItem.Time
 		}
 		statLock.Unlock()
 	}
