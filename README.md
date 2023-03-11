@@ -5,7 +5,7 @@ Follow nginx log, and find out bad guys! Ayano parses nginx log and shows client
 ## Build
 
 ```
-go build
+CGO_ENABLED=0 go build
 ```
 
 ## Usage
