@@ -30,6 +30,7 @@ var absoluteItemTime *bool
 var whole *bool
 var noNetstat *bool
 var parser *string
+var threshold *string
 
 var boldStart = "\u001b[1m"
 var boldEnd = "\u001b[22m"
@@ -147,10 +148,16 @@ func main() {
 	whole = flag.Bool("whole", false, "Analyze whole log file and then tail it")
 	noNetstat = flag.Bool("no-netstat", false, "Do not detect active connections")
 	parser = flag.String("parser", "nginx-json", "Parser to use (nginx-json or nginx-combined)")
+	threshold = flag.String("threshold", "100M", "Threshold size for request (only requests larger than this will be counted)")
 	flag.Parse()
 
 	if *parser != "nginx-json" && *parser != "nginx-combined" {
 		log.Fatal("Invalid parser")
+	}
+
+	thresholdBytes, err := humanize.ParseBytes(*threshold)
+	if err != nil {
+		log.Fatal("Invalid threshold (your input cannot be parsed)")
 	}
 
 	var filename string
@@ -210,7 +217,7 @@ func main() {
 			continue
 		}
 		size := logItem.Size
-		if size <= 100000000 {
+		if size <= thresholdBytes {
 			continue
 		}
 		clientip_str := logItem.Client
