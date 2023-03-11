@@ -10,7 +10,7 @@ CGO_ENABLED=0 go build
 
 ## Usage
 
-```
+```console
 > ./ayano -h
 Usage of ./ayano:
   -absolute
@@ -27,6 +27,10 @@ Usage of ./ayano:
         Threshold size for request (only requests larger than this will be counted) (default "100M")
   -whole
         Analyze whole log file and then tail it
+> # Example 1
+> ./ayano -n 20 -threshold 50M /var/log/nginx/access_json.log
+> # Example 2
+> ./ayano -n 50 -whole -parser nginx-combined /var/log/nginx/access.log
 ```
 
 ## Format support
