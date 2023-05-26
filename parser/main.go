@@ -7,6 +7,7 @@ type LogItem struct {
 	Client string
 	Time   time.Time
 	URL    string
+	Server string
 }
 
 type Parser interface {

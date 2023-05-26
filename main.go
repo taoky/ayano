@@ -39,7 +39,7 @@ func printTopValues() {
 	displayRecord := make(map[string]time.Time)
 	for {
 		time.Sleep(time.Duration(*refreshSec) * time.Second)
-		activeConn := make(map[string]bool)
+		activeConn := make(map[string]int)
 		if !*noNetstat {
 			// Get active connections
 			tabs, err := netstat.TCPSocks(func(s *netstat.SockTabEntry) bool {
@@ -53,7 +53,7 @@ func printTopValues() {
 					if !ok {
 						continue
 					}
-					activeConn[getIPPrefixString(ip)] = true
+					activeConn[getIPPrefixString(ip)] += 1
 				}
 			}
 			tabs, err = netstat.TCP6Socks(func(s *netstat.SockTabEntry) bool {
@@ -67,7 +67,7 @@ func printTopValues() {
 					if !ok {
 						continue
 					}
-					activeConn[getIPPrefixString(ip)] = true
+					activeConn[getIPPrefixString(ip)] += 1
 				}
 			}
 		}
@@ -114,10 +114,11 @@ func printTopValues() {
 			}
 			if !*noNetstat {
 				if _, ok := activeConn[key]; ok {
+					activeString := fmt.Sprintf(" (active, %d)", activeConn[key])
 					if !boldLine {
-						connection = fmt.Sprintf("%s%s%s", boldStart, " (active)", boldEnd)
+						connection = fmt.Sprintf("%s%s%s", boldStart, activeString, boldEnd)
 					} else {
-						connection = " (active)"
+						connection = activeString
 					}
 				}
 			}
@@ -149,6 +150,7 @@ func main() {
 	noNetstat = flag.Bool("no-netstat", false, "Do not detect active connections")
 	parser = flag.String("parser", "nginx-json", "Parser to use (nginx-json or nginx-combined)")
 	threshold = flag.String("threshold", "100M", "Threshold size for request (only requests larger than this will be counted)")
+	server := flag.String("server", "", "Server IP to filter (nginx-json only)")
 	flag.Parse()
 
 	if *parser != "nginx-json" && *parser != "nginx-combined" {
@@ -204,16 +206,19 @@ func main() {
 	for line := range t.Lines {
 		var logItem LogItem
 		var err error
+		var logParser Parser
 		if *parser == "nginx-json" {
-			var parser NginxJSONParser
-			logItem, err = parser.Parse(line.Text)
+			logParser = NginxJSONParser{}
 		} else if *parser == "nginx-combined" {
-			var parser NginxCombinedParser
-			logItem, err = parser.Parse(line.Text)
+			logParser = NginxCombinedParser{}
 		}
+		logItem, err = logParser.Parse(line.Text)
 		if err != nil {
 			log.Printf("parse error: %v\n", err)
 			log.Printf("got line: %s\n", line.Text)
+			continue
+		}
+		if *server != "" && logItem.Server != *server {
 			continue
 		}
 		size := logItem.Size
