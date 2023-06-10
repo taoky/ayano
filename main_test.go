@@ -34,7 +34,7 @@ func BenchmarkAnalyseLoop(b *testing.B) {
 	*refreshSec = 5
 	*absoluteItemTime = false
 	*whole = true
-	*noNetstat = false
+	*noNetstat = true
 	*parser = "nginx-json"
 	*threshold = "100M"
 	*server = ""
