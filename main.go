@@ -35,99 +35,112 @@ var threshold *string
 var boldStart = "\u001b[1m"
 var boldEnd = "\u001b[22m"
 
-func printTopValues() {
+func printTopValues(displayRecord map[string]time.Time, useLock bool) {
+	activeConn := make(map[string]int)
+	if !*noNetstat {
+		// Get active connections
+		tabs, err := netstat.TCPSocks(func(s *netstat.SockTabEntry) bool {
+			return s.State == netstat.Established
+		})
+		if err != nil {
+			log.Printf("netstat error: %v", err)
+		} else {
+			for _, tab := range tabs {
+				ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
+				if !ok {
+					continue
+				}
+				activeConn[getIPPrefixString(ip)] += 1
+			}
+		}
+		tabs, err = netstat.TCP6Socks(func(s *netstat.SockTabEntry) bool {
+			return s.State == netstat.Established
+		})
+		if err != nil {
+			log.Printf("netstat error: %v", err)
+		} else {
+			for _, tab := range tabs {
+				ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
+				if !ok {
+					continue
+				}
+				activeConn[getIPPrefixString(ip)] += 1
+			}
+		}
+	}
+
+	// sort stats key by value
+	var keys []string
+
+	if useLock {
+		statLock.Lock()
+	}
+
+	for k := range sizeStats {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return sizeStats[keys[i]] > sizeStats[keys[j]]
+	})
+	// print top N
+	top := *topShow
+	if len(keys) < *topShow {
+		top = len(keys)
+	}
+	for i := 0; i < top; i++ {
+		key := keys[i]
+		total := sizeStats[key]
+		reqTotal := reqStats[key]
+		last := lastURL[key]
+
+		var lastTime string
+		if *absoluteItemTime {
+			lastTime = lastURLUpdateDate[key].Format("2006-01-02 15:04:05")
+		} else {
+			lastTime = humanize.Time(lastURLUpdateDate[key])
+		}
+
+		average := total / uint64(reqTotal)
+
+		fmtStart := ""
+		fmtEnd := ""
+		connection := ""
+
+		boldLine := false
+		if displayRecord != nil && displayRecord[key] != lastURLUpdateDate[key] {
+			// display this line in bold
+			fmtStart = boldStart
+			fmtEnd = boldEnd
+			boldLine = true
+		}
+		if !*noNetstat {
+			if _, ok := activeConn[key]; ok {
+				activeString := fmt.Sprintf(" (active, %d)", activeConn[key])
+				if !boldLine {
+					connection = fmt.Sprintf("%s%s%s", boldStart, activeString, boldEnd)
+				} else {
+					connection = activeString
+				}
+			}
+		}
+		log.Printf("%s%s%s: %s %d %s %s (%s)%s\n", fmtStart, key, connection, humanize.Bytes(total), reqTotal,
+			humanize.Bytes(average), last, lastTime, fmtEnd)
+		if displayRecord != nil {
+			displayRecord[key] = lastURLUpdateDate[key]
+		}
+	}
+
+	if useLock {
+		statLock.Unlock()
+	}
+}
+
+func printTopValuesRoutine() {
 	displayRecord := make(map[string]time.Time)
 	for {
 		time.Sleep(time.Duration(*refreshSec) * time.Second)
-		activeConn := make(map[string]int)
-		if !*noNetstat {
-			// Get active connections
-			tabs, err := netstat.TCPSocks(func(s *netstat.SockTabEntry) bool {
-				return s.State == netstat.Established
-			})
-			if err != nil {
-				log.Printf("netstat error: %v", err)
-			} else {
-				for _, tab := range tabs {
-					ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
-					if !ok {
-						continue
-					}
-					activeConn[getIPPrefixString(ip)] += 1
-				}
-			}
-			tabs, err = netstat.TCP6Socks(func(s *netstat.SockTabEntry) bool {
-				return s.State == netstat.Established
-			})
-			if err != nil {
-				log.Printf("netstat error: %v", err)
-			} else {
-				for _, tab := range tabs {
-					ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
-					if !ok {
-						continue
-					}
-					activeConn[getIPPrefixString(ip)] += 1
-				}
-			}
-		}
-
-		// sort stats key by value
-		var keys []string
-		statLock.Lock()
-		for k := range sizeStats {
-			keys = append(keys, k)
-		}
-		sort.Slice(keys, func(i, j int) bool {
-			return sizeStats[keys[i]] > sizeStats[keys[j]]
-		})
-		// print top N
-		top := *topShow
-		if len(keys) < *topShow {
-			top = len(keys)
-		}
-		for i := 0; i < top; i++ {
-			key := keys[i]
-			total := sizeStats[key]
-			reqTotal := reqStats[key]
-			last := lastURL[key]
-
-			var lastTime string
-			if *absoluteItemTime {
-				lastTime = lastURLUpdateDate[key].Format("2006-01-02 15:04:05")
-			} else {
-				lastTime = humanize.Time(lastURLUpdateDate[key])
-			}
-
-			average := total / uint64(reqTotal)
-
-			fmtStart := ""
-			fmtEnd := ""
-			connection := ""
-
-			boldLine := false
-			if displayRecord[key] != lastURLUpdateDate[key] {
-				// display this line in bold
-				fmtStart = boldStart
-				fmtEnd = boldEnd
-				boldLine = true
-			}
-			if !*noNetstat {
-				if _, ok := activeConn[key]; ok {
-					activeString := fmt.Sprintf(" (active, %d)", activeConn[key])
-					if !boldLine {
-						connection = fmt.Sprintf("%s%s%s", boldStart, activeString, boldEnd)
-					} else {
-						connection = activeString
-					}
-				}
-			}
-			log.Printf("%s%s%s: %s %d %s %s (%s)%s\n", fmtStart, key, connection, humanize.Bytes(total), reqTotal,
-				humanize.Bytes(average), last, lastTime, fmtEnd)
-			displayRecord[key] = lastURLUpdateDate[key]
-		}
+		printTopValues(displayRecord, true)
 		fmt.Println()
-		statLock.Unlock()
 	}
 }
 
@@ -151,10 +164,15 @@ func main() {
 	parser = flag.String("parser", "nginx-json", "Parser to use (nginx-json or nginx-combined)")
 	threshold = flag.String("threshold", "100M", "Threshold size for request (only requests larger than this will be counted)")
 	server := flag.String("server", "", "Server IP to filter (nginx-json only)")
+	analyse := flag.Bool("analyse", false, "Log analyse mode (no tail following, only show top N at the end, and implies -whole)")
 	flag.Parse()
 
 	if *parser != "nginx-json" && *parser != "nginx-combined" {
 		log.Fatal("Invalid parser")
+	}
+
+	if *analyse {
+		*whole = true
 	}
 
 	thresholdBytes, err := humanize.ParseBytes(*threshold)
@@ -188,30 +206,35 @@ func main() {
 		}
 	}
 	t, err := tail.TailFile(filename, tail.Config{
-		Follow:        true,
-		ReOpen:        true,
+		Follow:        !*analyse, // When no in analyse mode, tail -f the file
+		ReOpen:        !*analyse, // ReOpen relies on Follow, so we disable it in analyse mode
 		Location:      seekInfo,
 		CompleteLines: true,
 	})
 	if err != nil {
 		panic(err)
 	}
-	go printTopValues()
+
+	if !*analyse {
+		go printTopValuesRoutine()
+	}
 
 	if !*whole {
 		// Eat a line from t.Lines, as first line may be incomplete
 		<-t.Lines
 	}
 
+	var logParser Parser
+	if *parser == "nginx-json" {
+		logParser = NginxJSONParser{}
+	} else if *parser == "nginx-combined" {
+		logParser = NginxCombinedParser{}
+	}
+
 	for line := range t.Lines {
 		var logItem LogItem
 		var err error
-		var logParser Parser
-		if *parser == "nginx-json" {
-			logParser = NginxJSONParser{}
-		} else if *parser == "nginx-combined" {
-			logParser = NginxCombinedParser{}
-		}
+
 		logItem, err = logParser.Parse(line.Text)
 		if err != nil {
 			log.Printf("parse error: %v\n", err)
@@ -232,7 +255,10 @@ func main() {
 			continue
 		}
 		clientPrefixString := getIPPrefixString(clientip)
-		statLock.Lock()
+
+		if !*analyse {
+			statLock.Lock()
+		}
 
 		sizeStats[clientPrefixString] += size
 		reqStats[clientPrefixString] += 1
@@ -242,6 +268,13 @@ func main() {
 			lastURL[clientPrefixString] = url
 			lastURLUpdateDate[clientPrefixString] = logItem.Time
 		}
-		statLock.Unlock()
+
+		if !*analyse {
+			statLock.Unlock()
+		}
+	}
+
+	if *analyse {
+		printTopValues(nil, false)
 	}
 }
