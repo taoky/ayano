@@ -161,7 +161,7 @@ func getIPPrefixString(ip netip.Addr) string {
 }
 
 // The function that does most work, and requires profiling in analysis mode
-func loop(iterator *FileIterator, logParser Parser) {
+func loop(iterator FileIterator, logParser Parser) {
 	for {
 		line, err := iterator.Next()
 		if err != nil {
@@ -219,7 +219,7 @@ func mapInit() {
 	lastURLUpdateDate = make(map[string]time.Time)
 }
 
-func openFileIterator(filename string) (*FileIterator, error) {
+func openFileIterator(filename string) (FileIterator, error) {
 	if !*analyse {
 		var seekInfo *tail.SeekInfo
 		if *whole {
