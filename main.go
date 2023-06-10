@@ -31,6 +31,10 @@ var whole *bool
 var noNetstat *bool
 var parser *string
 var threshold *string
+var server *string
+var analyse *bool
+
+var thresholdBytes uint64
 
 var boldStart = "\u001b[1m"
 var boldEnd = "\u001b[22m"
@@ -155,82 +159,8 @@ func getIPPrefixString(ip netip.Addr) string {
 	return clientPrefix.String()
 }
 
-func main() {
-	topShow = flag.Int("n", 10, "Show top N values")
-	refreshSec = flag.Int("r", 5, "Refresh interval in seconds")
-	absoluteItemTime = flag.Bool("absolute", false, "Show absolute time for each item")
-	whole = flag.Bool("whole", false, "Analyze whole log file and then tail it")
-	noNetstat = flag.Bool("no-netstat", false, "Do not detect active connections")
-	parser = flag.String("parser", "nginx-json", "Parser to use (nginx-json or nginx-combined)")
-	threshold = flag.String("threshold", "100M", "Threshold size for request (only requests larger than this will be counted)")
-	server := flag.String("server", "", "Server IP to filter (nginx-json only)")
-	analyse := flag.Bool("analyse", false, "Log analyse mode (no tail following, only show top N at the end, and implies -whole)")
-	flag.Parse()
-
-	if *parser != "nginx-json" && *parser != "nginx-combined" {
-		log.Fatal("Invalid parser")
-	}
-
-	if *analyse {
-		*whole = true
-	}
-
-	thresholdBytes, err := humanize.ParseBytes(*threshold)
-	if err != nil {
-		log.Fatal("Invalid threshold (your input cannot be parsed)")
-	}
-
-	var filename string
-	if len(flag.Args()) == 1 {
-		filename = flag.Args()[0]
-	} else {
-		filename = "/var/log/nginx/mirrors/access_json.log"
-	}
-	fmt.Fprintln(os.Stderr, "Using log file:", filename)
-
-	sizeStats = make(map[string]uint64)
-	reqStats = make(map[string]int)
-	lastURL = make(map[string]string)
-	lastURLUpdateDate = make(map[string]time.Time)
-
-	var seekInfo *tail.SeekInfo
-	if *whole {
-		seekInfo = &tail.SeekInfo{
-			Offset: 0,
-			Whence: io.SeekStart,
-		}
-	} else {
-		seekInfo = &tail.SeekInfo{
-			Offset: -1024 * 1024,
-			Whence: io.SeekEnd,
-		}
-	}
-	t, err := tail.TailFile(filename, tail.Config{
-		Follow:        !*analyse, // When no in analyse mode, tail -f the file
-		ReOpen:        !*analyse, // ReOpen relies on Follow, so we disable it in analyse mode
-		Location:      seekInfo,
-		CompleteLines: true,
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	if !*analyse {
-		go printTopValuesRoutine()
-	}
-
-	if !*whole {
-		// Eat a line from t.Lines, as first line may be incomplete
-		<-t.Lines
-	}
-
-	var logParser Parser
-	if *parser == "nginx-json" {
-		logParser = NginxJSONParser{}
-	} else if *parser == "nginx-combined" {
-		logParser = NginxCombinedParser{}
-	}
-
+// The function that does most work, and requires profiling in analysis mode
+func loop(t *tail.Tail, logParser Parser) {
 	for line := range t.Lines {
 		var logItem LogItem
 		var err error
@@ -273,6 +203,95 @@ func main() {
 			statLock.Unlock()
 		}
 	}
+}
+
+func mapInit() {
+	sizeStats = make(map[string]uint64)
+	reqStats = make(map[string]int)
+	lastURL = make(map[string]string)
+	lastURLUpdateDate = make(map[string]time.Time)
+}
+
+func openTailFile(filename string) (*tail.Tail, error) {
+	var seekInfo *tail.SeekInfo
+	if *whole {
+		seekInfo = &tail.SeekInfo{
+			Offset: 0,
+			Whence: io.SeekStart,
+		}
+	} else {
+		seekInfo = &tail.SeekInfo{
+			Offset: -1024 * 1024,
+			Whence: io.SeekEnd,
+		}
+	}
+	t, err := tail.TailFile(filename, tail.Config{
+		Follow:        !*analyse, // When no in analyse mode, tail -f the file
+		ReOpen:        !*analyse, // ReOpen relies on Follow, so we disable it in analyse mode
+		Location:      seekInfo,
+		CompleteLines: true,
+	})
+	return t, err
+}
+
+func main() {
+	topShow = flag.Int("n", 10, "Show top N values")
+	refreshSec = flag.Int("r", 5, "Refresh interval in seconds")
+	absoluteItemTime = flag.Bool("absolute", false, "Show absolute time for each item")
+	whole = flag.Bool("whole", false, "Analyze whole log file and then tail it")
+	noNetstat = flag.Bool("no-netstat", false, "Do not detect active connections")
+	parser = flag.String("parser", "nginx-json", "Parser to use (nginx-json or nginx-combined)")
+	threshold = flag.String("threshold", "100M", "Threshold size for request (only requests larger than this will be counted)")
+	server = flag.String("server", "", "Server IP to filter (nginx-json only)")
+	analyse = flag.Bool("analyse", false, "Log analyse mode (no tail following, only show top N at the end, and implies -whole)")
+	flag.Parse()
+
+	if *parser != "nginx-json" && *parser != "nginx-combined" {
+		log.Fatal("Invalid parser")
+	}
+
+	if *analyse {
+		*whole = true
+	}
+
+	var err error
+	thresholdBytes, err = humanize.ParseBytes(*threshold)
+	if err != nil {
+		log.Fatal("Invalid threshold (your input cannot be parsed)")
+	}
+
+	var filename string
+	if len(flag.Args()) == 1 {
+		filename = flag.Args()[0]
+	} else {
+		filename = "/var/log/nginx/mirrors/access_json.log"
+	}
+	fmt.Fprintln(os.Stderr, "Using log file:", filename)
+
+	mapInit()
+
+	t, err := openTailFile(filename)
+	if err != nil {
+		panic(err)
+	}
+
+	if !*analyse {
+		go printTopValuesRoutine()
+	}
+
+	if !*whole {
+		// Eat a line from t.Lines, as first line may be incomplete
+		<-t.Lines
+	}
+
+	var logParser Parser
+	if *parser == "nginx-json" {
+		logParser = NginxJSONParser{}
+	} else if *parser == "nginx-combined" {
+		logParser = NginxCombinedParser{}
+	}
+
+	loop(t, logParser)
 
 	if *analyse {
 		printTopValues(nil, false)
