@@ -9,41 +9,43 @@ import (
 
 type NginxCombinedParser struct{}
 
-func (p NginxCombinedParser) Parse(line string) (LogItem, error) {
+func (p NginxCombinedParser) Parse(line []byte) (LogItem, error) {
+	// TODO: avoid using string for performance
+	lineStr := string(line)
 	// get the first -
-	delimIndex := strings.Index(line, " - ")
+	delimIndex := strings.Index(lineStr, " - ")
 	if delimIndex == -1 {
 		return LogItem{}, errors.New("unexpected format: no -")
 	}
 
-	clientIP := line[:delimIndex]
+	clientIP := lineStr[:delimIndex]
 	// get time within [$time_local]
-	leftBracketIndex := strings.Index(line, "[")
+	leftBracketIndex := strings.Index(lineStr, "[")
 	if leftBracketIndex == -1 {
 		return LogItem{}, errors.New("unexpected format: no [")
 	}
-	rightBracketIndex := strings.Index(line, "]")
+	rightBracketIndex := strings.Index(lineStr, "]")
 	if rightBracketIndex == -1 {
 		return LogItem{}, errors.New("unexpected format: no ]")
 	}
 
-	localTimeString := line[leftBracketIndex+1 : rightBracketIndex]
+	localTimeString := lineStr[leftBracketIndex+1 : rightBracketIndex]
 	localTime, err := time.Parse("02/Jan/2006:15:04:05 -0700", localTimeString)
 	if err != nil {
 		return LogItem{}, err
 	}
 	// get URL within first "$request"
-	leftQuoteIndex := strings.Index(line, "\"")
+	leftQuoteIndex := strings.Index(lineStr, "\"")
 	if leftQuoteIndex == -1 {
 		return LogItem{}, errors.New("unexpected format: no \"")
 	}
-	rightQuoteIndex := strings.Index(line[leftQuoteIndex+1:], "\"")
+	rightQuoteIndex := strings.Index(lineStr[leftQuoteIndex+1:], "\"")
 	if rightQuoteIndex == -1 {
 		return LogItem{}, errors.New("unexpected format: no \" after first \"")
 	}
 	rightQuoteIndex += leftQuoteIndex + 1
 
-	url := line[leftQuoteIndex+1 : rightQuoteIndex]
+	url := lineStr[leftQuoteIndex+1 : rightQuoteIndex]
 	// strip HTTP method in url
 	splitBySpace := strings.Split(url, " ")
 	if len(splitBySpace) < 2 {
@@ -51,7 +53,7 @@ func (p NginxCombinedParser) Parse(line string) (LogItem, error) {
 	}
 	url = splitBySpace[1]
 	// get size ($body_bytes_sent)
-	splitBySpace = strings.Split(line[rightQuoteIndex:], " ")
+	splitBySpace = strings.Split(lineStr[rightQuoteIndex:], " ")
 	if len(splitBySpace) < 3 {
 		return LogItem{}, errors.New("unexpected format: not enough fields after parsing URL")
 	}

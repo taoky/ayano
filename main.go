@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"io"
@@ -160,15 +161,21 @@ func getIPPrefixString(ip netip.Addr) string {
 }
 
 // The function that does most work, and requires profiling in analysis mode
-func loop(t *tail.Tail, logParser Parser) {
-	for line := range t.Lines {
+func loop(iterator *FileIterator, logParser Parser) {
+	for {
+		line, err := iterator.Next()
+		if err != nil {
+			log.Fatalln("iterator error: ", err)
+		}
+		if line == nil {
+			break
+		}
 		var logItem LogItem
-		var err error
 
-		logItem, err = logParser.Parse(line.Text)
+		logItem, err = logParser.Parse(line)
 		if err != nil {
 			log.Printf("parse error: %v\n", err)
-			log.Printf("got line: %s\n", line.Text)
+			log.Printf("got line: %s\n", line)
 			continue
 		}
 		if *server != "" && logItem.Server != *server {
@@ -212,26 +219,43 @@ func mapInit() {
 	lastURLUpdateDate = make(map[string]time.Time)
 }
 
-func openTailFile(filename string) (*tail.Tail, error) {
-	var seekInfo *tail.SeekInfo
-	if *whole {
-		seekInfo = &tail.SeekInfo{
-			Offset: 0,
-			Whence: io.SeekStart,
+func openFileIterator(filename string) (*FileIterator, error) {
+	if !*analyse {
+		var seekInfo *tail.SeekInfo
+		if *whole {
+			seekInfo = &tail.SeekInfo{
+				Offset: 0,
+				Whence: io.SeekStart,
+			}
+		} else {
+			seekInfo = &tail.SeekInfo{
+				Offset: -1024 * 1024,
+				Whence: io.SeekEnd,
+			}
 		}
+		t, err := tail.TailFile(filename, tail.Config{
+			Follow:        true,
+			ReOpen:        true,
+			Location:      seekInfo,
+			CompleteLines: true,
+			MustExist:     true,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if !*whole {
+			// Eat a line from t.Lines, as first line may be incomplete
+			<-t.Lines
+		}
+		return NewFileIteratorWithTail(t), nil
 	} else {
-		seekInfo = &tail.SeekInfo{
-			Offset: -1024 * 1024,
-			Whence: io.SeekEnd,
+		file, err := os.Open(filename)
+		if err != nil {
+			return nil, err
 		}
+		scanner := bufio.NewScanner(file)
+		return NewFileIteratorWithScanner(scanner), nil
 	}
-	t, err := tail.TailFile(filename, tail.Config{
-		Follow:        !*analyse, // When no in analyse mode, tail -f the file
-		ReOpen:        !*analyse, // ReOpen relies on Follow, so we disable it in analyse mode
-		Location:      seekInfo,
-		CompleteLines: true,
-	})
-	return t, err
 }
 
 func main() {
@@ -270,18 +294,13 @@ func main() {
 
 	mapInit()
 
-	t, err := openTailFile(filename)
+	iterator, err := openFileIterator(filename)
 	if err != nil {
 		panic(err)
 	}
 
 	if !*analyse {
 		go printTopValuesRoutine()
-	}
-
-	if !*whole {
-		// Eat a line from t.Lines, as first line may be incomplete
-		<-t.Lines
 	}
 
 	var logParser Parser
@@ -291,7 +310,7 @@ func main() {
 		logParser = NginxCombinedParser{}
 	}
 
-	loop(t, logParser)
+	loop(iterator, logParser)
 
 	if *analyse {
 		printTopValues(nil, false)

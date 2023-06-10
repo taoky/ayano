@@ -19,9 +19,9 @@ type NginxJSONLog struct {
 	ServerIP  string  `json:"serverip"`
 }
 
-func (p NginxJSONParser) Parse(line string) (LogItem, error) {
+func (p NginxJSONParser) Parse(line []byte) (LogItem, error) {
 	var logItem NginxJSONLog
-	err := json.Unmarshal([]byte(line), &logItem)
+	err := json.Unmarshal(line, &logItem)
 	if err != nil {
 		return LogItem{}, err
 	}

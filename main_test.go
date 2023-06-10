@@ -45,7 +45,7 @@ func BenchmarkAnalyseLoop(b *testing.B) {
 	if err != nil {
 		panic(err)
 	}
-	t, err := openTailFile(logPath)
+	t, err := openFileIterator(logPath)
 	if err != nil {
 		panic(err)
 	}

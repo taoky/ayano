@@ -11,5 +11,5 @@ type LogItem struct {
 }
 
 type Parser interface {
-	Parse(line string) (LogItem, error)
+	Parse(line []byte) (LogItem, error)
 }

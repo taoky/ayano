@@ -8,7 +8,7 @@ import (
 func TestNginxJsonParser(t *testing.T) {
 	p := NginxJSONParser{}
 	line := `{"timestamp":1678551332.293,"clientip":"123.45.67.8","serverip":"87.65.4.32","method":"GET","url":"/path/to/a/file","status":200,"size":3009,"resp_time":0.000,"http_host":"example.com","referer":"","user_agent":""}`
-	log, err := p.Parse(line)
+	log, err := p.Parse([]byte(line))
 	if err != nil {
 		t.Error(err)
 	}
@@ -30,7 +30,7 @@ func TestNginxJsonParser(t *testing.T) {
 func TestNginxCombinedParser(t *testing.T) {
 	p := NginxCombinedParser{}
 	line := `123.45.67.8 - - [12/Mar/2023:00:15:32 +0800] "GET /path/to/a/file HTTP/1.1" 200 3009 "-" ""`
-	log, err := p.Parse(line)
+	log, err := p.Parse([]byte(line))
 	if err != nil {
 		t.Error(err)
 	}
