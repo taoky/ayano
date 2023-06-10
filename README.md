@@ -15,6 +15,8 @@ CGO_ENABLED=0 go build
 Usage of ./ayano:
   -absolute
         Show absolute time for each item
+  -analyse
+        Log analyse mode (no tail following, only show top N at the end, and implies -whole)
   -n int
         Show top N values (default 10)
   -no-netstat
@@ -23,6 +25,8 @@ Usage of ./ayano:
         Parser to use (nginx-json or nginx-combined) (default "nginx-json")
   -r int
         Refresh interval in seconds (default 5)
+  -server string
+        Server IP to filter (nginx-json only)
   -threshold string
         Threshold size for request (only requests larger than this will be counted) (default "100M")
   -whole
@@ -31,6 +35,8 @@ Usage of ./ayano:
 > ./ayano -n 20 -threshold 50M /var/log/nginx/access_json.log
 > # Example 2
 > ./ayano -n 50 -whole -parser nginx-combined /var/log/nginx/access.log
+> # Example 3. This will use fast path to analyse log, and just print result and quit.
+> ./ayano -n 100 -analyse /var/log/nginx/access_json.log
 ```
 
 ## Format support
