@@ -6,46 +6,36 @@ import (
 	"github.com/nxadm/tail"
 )
 
-type FileIteratorType int
-
-const (
-	Scanner FileIteratorType = 0
-	Tail    FileIteratorType = 1
-)
-
-type FileIterator struct {
-	Type    FileIteratorType
-	scanner *bufio.Scanner
-	tail    *tail.Tail
+type FileIterator interface {
+	Next() ([]byte, error)
 }
 
-func NewFileIteratorWithScanner(scanner *bufio.Scanner) *FileIterator {
+type scannerIterator struct {
+	scanner *bufio.Scanner
+}
+
+func NewFileIteratorWithScanner(scanner *bufio.Scanner) FileIterator {
 	// Prepare a large buffer
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
-	return &FileIterator{
-		Type:    Scanner,
-		scanner: scanner,
+	return &scannerIterator{scanner: scanner}
+}
+
+func (s *scannerIterator) Next() ([]byte, error) {
+	if s.scanner.Scan() {
+		return s.scanner.Bytes(), nil
+	} else {
+		return nil, s.scanner.Err()
 	}
 }
 
-func NewFileIteratorWithTail(tail *tail.Tail) *FileIterator {
-	return &FileIterator{
-		Type: Tail,
-		tail: tail,
-	}
+type tailIterator struct {
+	tail *tail.Tail
 }
 
-func (i FileIterator) Next() ([]byte, error) {
-	switch i.Type {
-	case Scanner:
-		if i.scanner.Scan() {
-			return i.scanner.Bytes(), nil
-		} else {
-			return nil, i.scanner.Err()
-		}
-	case Tail:
-		return []byte((<-i.tail.Lines).Text), nil
-	default:
-		panic("unknown iterator type")
-	}
+func (t tailIterator) Next() ([]byte, error) {
+	return []byte((<-t.tail.Lines).Text), nil
+}
+
+func NewFileIteratorWithTail(tail *tail.Tail) FileIterator {
+	return &tailIterator{tail: tail}
 }
