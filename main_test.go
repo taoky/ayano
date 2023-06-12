@@ -54,3 +54,37 @@ func BenchmarkAnalyseLoop(b *testing.B) {
 	loop(t, logParser)
 	printTopValues(nil, false)
 }
+
+func BenchmarkAnalyseLoopCombined(b *testing.B) {
+	// get logPath from env
+	logPath := os.Getenv("LOG_PATH")
+	if logPath == "" {
+		panic("LOG_PATH is not set")
+	}
+	// init global vars
+	mapInit()
+	ptrInit()
+	*topShow = 20
+	*refreshSec = 5
+	*absoluteItemTime = false
+	*whole = true
+	*noNetstat = true
+	*parser = "nginx-combined"
+	*threshold = "100M"
+	*server = ""
+	*analyse = true
+
+	var err error
+	thresholdBytes, err = humanize.ParseBytes(*threshold)
+	if err != nil {
+		panic(err)
+	}
+	t, err := openFileIterator(logPath)
+	if err != nil {
+		panic(err)
+	}
+	logParser := NginxCombinedParser{}
+
+	loop(t, logParser)
+	printTopValues(nil, false)
+}
