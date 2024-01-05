@@ -91,6 +91,9 @@ func printTopValues(displayRecord map[string]time.Time, useLock bool) {
 	top := *topShow
 	if len(keys) < *topShow {
 		top = len(keys)
+	} else if *topShow == 0 {
+		// no limit
+		top = len(keys)
 	}
 	for i := 0; i < top; i++ {
 		key := keys[i]
@@ -259,7 +262,7 @@ func openFileIterator(filename string) (FileIterator, error) {
 }
 
 func main() {
-	topShow = flag.Int("n", 10, "Show top N values")
+	topShow = flag.Int("n", 10, "Show top N values (0 means no limit)")
 	refreshSec = flag.Int("r", 5, "Refresh interval in seconds")
 	absoluteItemTime = flag.Bool("absolute", false, "Show absolute time for each item")
 	whole = flag.Bool("whole", false, "Analyze whole log file and then tail it")
