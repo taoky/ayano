@@ -36,21 +36,13 @@ jobs:
     - name: Deploy - Create Release
       if: startsWith(github.ref, 'refs/tags/')
       id: create_release
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ github.ref_name }}
         release_name: ${{ github.ref_name }}
         draft: false
-        prerelease: false
-
-    - name: Deploy - Upload Release
-      if: startsWith(github.ref, 'refs/tags/')
-      id: upload-release-asset 
-      uses: csexton/release-asset-action@v2
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        release-url: ${{ steps.create_release.outputs.upload_url }}
         files: |
           ayano
+        prerelease: false
