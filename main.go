@@ -22,7 +22,13 @@ import (
 var sizeStats map[string]uint64
 var reqStats map[string]int
 var lastURL map[string]string
+
+// Record time of last URL change
 var lastURLUpdateDate map[string]time.Time
+
+// Record time of last URL access
+var lastURLAccessDate map[string]time.Time
+
 var statLock sync.Mutex
 
 var topShow *int
@@ -101,11 +107,14 @@ func printTopValues(displayRecord map[string]time.Time, useLock bool) {
 		reqTotal := reqStats[key]
 		last := lastURL[key]
 
-		var lastTime string
+		var lastUpdateTime string
+		var lastAccessTime string
 		if *absoluteItemTime {
-			lastTime = lastURLUpdateDate[key].Format("2006-01-02 15:04:05")
+			lastUpdateTime = lastURLUpdateDate[key].Format("2006-01-02 15:04:05")
+			lastAccessTime = lastURLAccessDate[key].Format("2006-01-02 15:04:05")
 		} else {
-			lastTime = humanize.Time(lastURLUpdateDate[key])
+			lastUpdateTime = humanize.Time(lastURLUpdateDate[key])
+			lastAccessTime = humanize.Time(lastURLAccessDate[key])
 		}
 
 		average := total / uint64(reqTotal)
@@ -115,7 +124,7 @@ func printTopValues(displayRecord map[string]time.Time, useLock bool) {
 		connection := ""
 
 		boldLine := false
-		if displayRecord != nil && displayRecord[key] != lastURLUpdateDate[key] {
+		if displayRecord != nil && displayRecord[key] != lastURLAccessDate[key] {
 			// display this line in bold
 			fmtStart = boldStart
 			fmtEnd = boldEnd
@@ -131,10 +140,10 @@ func printTopValues(displayRecord map[string]time.Time, useLock bool) {
 				}
 			}
 		}
-		log.Printf("%s%s%s: %s %d %s %s (%s)%s\n", fmtStart, key, connection, humanize.Bytes(total), reqTotal,
-			humanize.Bytes(average), last, lastTime, fmtEnd)
+		log.Printf("%s%s%s: %s %d %s %s (from %s, last accessed %s)%s\n", fmtStart, key, connection, humanize.Bytes(total), reqTotal,
+			humanize.Bytes(average), last, lastUpdateTime, lastAccessTime, fmtEnd)
 		if displayRecord != nil {
-			displayRecord[key] = lastURLUpdateDate[key]
+			displayRecord[key] = lastURLAccessDate[key]
 		}
 	}
 
@@ -208,6 +217,7 @@ func loop(iterator FileIterator, logParser Parser) {
 			lastURL[clientPrefixString] = url
 			lastURLUpdateDate[clientPrefixString] = logItem.Time
 		}
+		lastURLAccessDate[clientPrefixString] = logItem.Time
 
 		if !*analyse {
 			statLock.Unlock()
@@ -220,6 +230,7 @@ func mapInit() {
 	reqStats = make(map[string]int)
 	lastURL = make(map[string]string)
 	lastURLUpdateDate = make(map[string]time.Time)
+	lastURLAccessDate = make(map[string]time.Time)
 }
 
 func openFileIterator(filename string) (FileIterator, error) {
