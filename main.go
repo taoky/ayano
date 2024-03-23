@@ -152,8 +152,8 @@ func printTopValues(displayRecord map[string]time.Time, useLock bool) {
 				}
 			}
 		}
-		log.Printf("%s%s%s: %s %d %s %s (from %s, last accessed %s)%s\n", fmtStart, key, connection, humanize.Bytes(total), reqTotal,
-			humanize.Bytes(average), last, lastUpdateTime, lastAccessTime, fmtEnd)
+		log.Printf("%s%s%s: %s %d %s %s (from %s, last accessed %s)%s\n", fmtStart, key, connection, humanize.IBytes(total), reqTotal,
+			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime, fmtEnd)
 		if displayRecord != nil {
 			displayRecord[key] = lastURLAccessDate[key]
 		}
