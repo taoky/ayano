@@ -18,7 +18,7 @@ Usage of ./ayano:
   -analyse
         Log analyse mode (no tail following, only show top N at the end, and implies -whole)
   -daemon
-        Daemon mode, prints out IP cidr and total size every 1GB
+        Daemon mode, prints out IP cidr and total size every 1GiB
   -n int
         Show top N values (0 means no limit) (default 10)
   -no-netstat
@@ -50,6 +50,16 @@ Read <https://github.com/taoky/ayano/issues/3> for current log format.
 A reference systemd service file and logrotate file are provided in [assets/](assets/).
 
 Please note that the stats output would NOT be rotated (unless you restart ayano).
+
+If you don't like to use fail2ban, you could also use this simple one-liner to check stats. Here is an example:
+
+```console
+$ awk '{print $3}' record.log | sort | uniq -c | sort -nr
+36 114.5.14.0/24
+ 3 191.9.81.0/24
+```
+
+which means that "114.5.14.0/24" takes at least 36GiB bandwidth, and "191.9.81.0/24" takes at least 3GiB bandwidth, for the time period this log file covers.
 
 ## Format support
 

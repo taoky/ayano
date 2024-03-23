@@ -316,7 +316,7 @@ func main() {
 	threshold = flag.String("threshold", "100M", "Threshold size for request (only requests larger than this will be counted)")
 	server = flag.String("server", "", "Server IP to filter (nginx-json only)")
 	analyse = flag.Bool("analyse", false, "Log analyse mode (no tail following, only show top N at the end, and implies -whole)")
-	daemon = flag.Bool("daemon", false, "Daemon mode, prints out IP cidr and total size every 1GB")
+	daemon = flag.Bool("daemon", false, "Daemon mode, prints out IP cidr and total size every 1GiB")
 	logOutput = flag.String("outlog", "", "Change log output file")
 	flag.Parse()
 
