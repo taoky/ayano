@@ -87,3 +87,6 @@ Ayano supports two types of nginx log:
 ## Naming
 
 Ayano is named after *Sugiura Ayano*, the Student Council vice-president in [*Yuru Yuri*](https://en.wikipedia.org/wiki/YuruYuri#Student_Council).
+
+Also, if you want something easier to use than iftop... Please try my new little project [chitose](https://github.com/taoky/chitose)!
+
