@@ -17,8 +17,10 @@ Usage of ./ayano:
         Show absolute time for each item
   -analyse
         Log analyse mode (no tail following, only show top N at the end, and implies -whole)
+  -daemon
+        Daemon mode, prints out IP cidr and total size every 1GB
   -n int
-        Show top N values (default 10)
+        Show top N values (0 means no limit) (default 10)
   -no-netstat
         Do not detect active connections
   -parser string

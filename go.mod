@@ -1,6 +1,6 @@
 module github.com/taoky/ayano
 
-go 1.20
+go 1.22
 
 require (
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5

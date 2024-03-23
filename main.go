@@ -23,6 +23,11 @@ var sizeStats map[string]uint64
 var reqStats map[string]int
 var lastURL map[string]string
 
+// Variables for daemon mode
+var lastsizeStats map[string]uint64
+var oneGB uint64 = 1024 * 1024 * 1024
+var firstSeenDate map[string]time.Time
+
 // Record time of last URL change
 var lastURLUpdateDate map[string]time.Time
 
@@ -40,6 +45,7 @@ var parser *string
 var threshold *string
 var server *string
 var analyse *bool
+var daemon *bool
 
 var thresholdBytes uint64
 
@@ -205,7 +211,7 @@ func loop(iterator FileIterator, logParser Parser) {
 		}
 		clientPrefixString := getIPPrefixString(clientip)
 
-		if !*analyse {
+		if !*analyse && !*daemon {
 			statLock.Lock()
 		}
 
@@ -219,14 +225,27 @@ func loop(iterator FileIterator, logParser Parser) {
 		}
 		lastURLAccessDate[clientPrefixString] = logItem.Time
 
-		if !*analyse {
+		if !*analyse && !*daemon {
 			statLock.Unlock()
+		} else if *daemon {
+			delta := sizeStats[clientPrefixString] - lastsizeStats[clientPrefixString]
+			printTimes := delta / oneGB
+			for range printTimes {
+				if lastsizeStats[clientPrefixString] == 0 {
+					firstSeenDate[clientPrefixString] = logItem.Time
+				}
+				log.Printf("%s %s %s %s", clientPrefixString, humanize.Bytes(sizeStats[clientPrefixString]),
+					firstSeenDate[clientPrefixString].Format("2006-01-02 15:04:05"), url)
+				lastsizeStats[clientPrefixString] = sizeStats[clientPrefixString]
+			}
 		}
 	}
 }
 
 func mapInit() {
 	sizeStats = make(map[string]uint64)
+	lastsizeStats = make(map[string]uint64)
+	firstSeenDate = make(map[string]time.Time)
 	reqStats = make(map[string]int)
 	lastURL = make(map[string]string)
 	lastURLUpdateDate = make(map[string]time.Time)
@@ -282,6 +301,7 @@ func main() {
 	threshold = flag.String("threshold", "100M", "Threshold size for request (only requests larger than this will be counted)")
 	server = flag.String("server", "", "Server IP to filter (nginx-json only)")
 	analyse = flag.Bool("analyse", false, "Log analyse mode (no tail following, only show top N at the end, and implies -whole)")
+	daemon = flag.Bool("daemon", false, "Daemon mode, prints out IP cidr and total size every 1GB")
 	flag.Parse()
 
 	if *parser != "nginx-json" && *parser != "nginx-combined" {
@@ -313,7 +333,7 @@ func main() {
 		panic(err)
 	}
 
-	if !*analyse {
+	if !*analyse && !*daemon {
 		go printTopValuesRoutine()
 	}
 
