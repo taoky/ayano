@@ -1,0 +1,14 @@
+[Unit]
+Description=Nginx log analyzer for OSS mirrors, working with fail2ban
+
+[Service]
+Restart=on-failure
+StartLimitInterval=10s
+MemoryMax=5G
+ExecStart=/usr/local/bin/ayano -daemon -outlog /var/log/ayano/record.log
+ExecReload=/bin/kill -HUP $MAINPID
+User=nobody
+Group=nogroup
+
+[Install]
+WantedBy=multi-user.target

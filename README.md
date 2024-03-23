@@ -23,6 +23,8 @@ Usage of ./ayano:
         Show top N values (0 means no limit) (default 10)
   -no-netstat
         Do not detect active connections
+  -outlog string
+        Change log output file
   -parser string
         Parser to use (nginx-json or nginx-combined) (default "nginx-json")
   -r int
@@ -40,6 +42,14 @@ Usage of ./ayano:
 > # Example 3. This will use fast path to analyse log, and just print result and quit.
 > ./ayano -n 100 -analyse /var/log/nginx/access_json.log
 ```
+
+### Daemon mode (experimental)
+
+Daemon mode is a simple log output mode that intended to work with fail2ban.
+Read <https://github.com/taoky/ayano/issues/3> for current log format.
+A reference systemd service file and logrotate file are provided in [assets/](assets/).
+
+Please note that the stats output would NOT be rotated (unless you restart ayano).
 
 ## Format support
 

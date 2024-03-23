@@ -1,0 +1,15 @@
+/var/log/ayano/*.log
+{
+	create 0644 nobody nogroup
+	daily
+	size 100M
+	rotate 200
+	dateext
+	compress
+	notifempty
+	missingok
+
+	postrotate
+		systemctl reload ayano.service
+	endscript
+}

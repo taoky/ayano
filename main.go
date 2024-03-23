@@ -8,8 +8,11 @@ import (
 	"log"
 	"net/netip"
 	"os"
+	"os/signal"
+	"runtime"
 	"sort"
 	"sync"
+	"syscall"
 	"time"
 
 	. "github.com/taoky/ayano/parser"
@@ -46,6 +49,9 @@ var threshold *string
 var server *string
 var analyse *bool
 var daemon *bool
+var logOutput *string
+
+var logFile *os.File
 
 var thresholdBytes uint64
 
@@ -234,7 +240,7 @@ func loop(iterator FileIterator, logParser Parser) {
 				if lastsizeStats[clientPrefixString] == 0 {
 					firstSeenDate[clientPrefixString] = logItem.Time
 				}
-				log.Printf("%s %s %s %s", clientPrefixString, humanize.Bytes(sizeStats[clientPrefixString]),
+				log.Printf("%s %s %s %s", clientPrefixString, humanize.IBytes(sizeStats[clientPrefixString]),
 					firstSeenDate[clientPrefixString].Format("2006-01-02 15:04:05"), url)
 				lastsizeStats[clientPrefixString] = sizeStats[clientPrefixString]
 			}
@@ -291,6 +297,15 @@ func openFileIterator(filename string) (FileIterator, error) {
 	}
 }
 
+func setLogOutput() {
+	var err error
+	logFile, err = os.OpenFile(*logOutput, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.SetOutput(logFile)
+}
+
 func main() {
 	topShow = flag.Int("n", 10, "Show top N values (0 means no limit)")
 	refreshSec = flag.Int("r", 5, "Refresh interval in seconds")
@@ -302,10 +317,28 @@ func main() {
 	server = flag.String("server", "", "Server IP to filter (nginx-json only)")
 	analyse = flag.Bool("analyse", false, "Log analyse mode (no tail following, only show top N at the end, and implies -whole)")
 	daemon = flag.Bool("daemon", false, "Daemon mode, prints out IP cidr and total size every 1GB")
+	logOutput = flag.String("outlog", "", "Change log output file")
 	flag.Parse()
 
 	if *parser != "nginx-json" && *parser != "nginx-combined" {
 		log.Fatal("Invalid parser")
+	}
+
+	if *logOutput != "" {
+		setLogOutput()
+
+		// setup SIGHUP to reopen log file
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, syscall.SIGHUP)
+		go func() {
+			for sig := range c {
+				if sig == syscall.SIGHUP {
+					setLogOutput()
+					// Let GC close the old file
+					runtime.GC()
+				}
+			}
+		}()
 	}
 
 	if *analyse {
