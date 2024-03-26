@@ -30,7 +30,9 @@ jobs:
         go test -race ./... && go vet ./...
 
     - name: Build
-      run: CGO_ENABLED=0 go build -v .
+      run: |
+        GOARCH=amd64 CGO_ENABLED=0 go build -o ayano-amd64 -v .
+        GOARCH=arm64 CGO_ENABLED=0 go build -o ayano-arm64 -v .
 
     - name: Deploy - Create Release
       if: startsWith(github.ref, 'refs/tags/')
@@ -43,5 +45,6 @@ jobs:
         release_name: ${{ github.ref_name }}
         draft: false
         files: |
-          ayano
+          ayano-amd64
+          ayano-arm64
         prerelease: false
