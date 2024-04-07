@@ -144,15 +144,17 @@ func printTopValues(displayRecord map[string]time.Time, useLock bool) {
 		}
 		if !*noNetstat {
 			if _, ok := activeConn[key]; ok {
-				activeString := fmt.Sprintf(" (active, %d)", activeConn[key])
+				activeString := fmt.Sprintf(" (%2d)", activeConn[key])
 				if !boldLine {
 					connection = fmt.Sprintf("%s%s%s", boldStart, activeString, boldEnd)
 				} else {
 					connection = activeString
 				}
+			} else {
+				connection = "     "
 			}
 		}
-		log.Printf("%s%s%s: %s %d %s %s (from %s, last accessed %s)%s\n", fmtStart, key, connection, humanize.IBytes(total), reqTotal,
+		log.Printf("%s%16s%s: %7s %3d %7s %s (from %s, last accessed %s)%s\n", fmtStart, key, connection, humanize.IBytes(total), reqTotal,
 			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime, fmtEnd)
 		if displayRecord != nil {
 			displayRecord[key] = lastURLAccessDate[key]
