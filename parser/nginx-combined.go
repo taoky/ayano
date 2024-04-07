@@ -51,14 +51,18 @@ func (p NginxCombinedParser) Parse(line []byte) (LogItem, error) {
 	// strip HTTP method in url
 	spaceIndex := bytes.IndexByte(url, ' ')
 	if spaceIndex == -1 {
-		return LogItem{}, errors.New("unexpected format: URL does not have method")
+		// Some abnormal requests do not have a HTTP method
+		// Sliently ignore this case
+	} else {
+		url = url[spaceIndex+1:]
 	}
-	url = url[spaceIndex+1:]
 	spaceIndex = bytes.IndexByte(url, ' ')
 	if spaceIndex == -1 {
-		return LogItem{}, errors.New("unexpected format: URL does not have HTTP version")
+		// Some abnormal requests do not have a HTTP version
+		// Sliently ignore this case
+	} else {
+		url = url[:spaceIndex]
 	}
-	url = url[:spaceIndex]
 
 	// get size ($body_bytes_sent)
 	baseIdx += 1
