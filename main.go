@@ -351,9 +351,11 @@ func main() {
 		go func() {
 			for sig := range c {
 				if sig == syscall.SIGHUP {
+					MustSdNotifyReloading()
 					setLogOutput()
 					// Let GC close the old file
 					runtime.GC()
+					MustSdNotifyReady()
 				}
 			}
 		}()
@@ -393,6 +395,10 @@ func main() {
 		logParser = NginxJSONParser{}
 	} else if *parser == "nginx-combined" {
 		logParser = NginxCombinedParser{}
+	}
+
+	if *daemon {
+		MustSdNotifyReady()
 	}
 
 	loop(iterator, logParser)
