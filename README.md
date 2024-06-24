@@ -46,8 +46,18 @@ Usage of ./ayano:
 ### Daemon mode (experimental)
 
 Daemon mode is a simple log output mode that intended to work with fail2ban.
-Read <https://github.com/taoky/ayano/issues/3> for current log format.
-A reference systemd service file and logrotate file are provided in [assets/](assets/).
+
+Current log format looks like this (`log_time client_cidr total_gib GiB first_time path`):
+
+```log
+2024/06/25 01:03:17 172.26.3.0/24 1.0 GiB 2024-06-25 01:03:17 /big
+2024/06/25 01:03:29 172.26.3.0/24 2.0 GiB 2024-06-25 01:03:17 /big
+2024/06/25 01:03:42 172.26.3.0/24 3.0 GiB 2024-06-25 01:03:17 /big
+2024/06/25 01:03:56 172.26.3.0/24 4.0 GiB 2024-06-25 01:03:17 /big
+2024/06/25 01:04:09 172.26.3.0/24 5.0 GiB 2024-06-25 01:03:17 /big
+```
+
+A reference systemd service file, logrotate file and fail2ban configs are provided in [assets/](assets/).
 
 Please note that the stats output would NOT be rotated (unless you restart ayano).
 
