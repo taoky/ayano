@@ -269,9 +269,25 @@ func openFileIterator(filename string) (FileIterator, error) {
 				Whence: io.SeekStart,
 			}
 		} else {
-			seekInfo = &tail.SeekInfo{
-				Offset: -1024 * 1024,
-				Whence: io.SeekEnd,
+			// Workaround: In this case seek does not support to keep seek at start when file < 1MiB
+			// So here we check file size first, though it could have race condition,
+			// at least it's better than crashing later
+			fileInfo, err := os.Stat(filename)
+			if err != nil {
+				return nil, err
+			}
+			fileSize := fileInfo.Size()
+			if fileSize < 1024*1024 {
+				// The log file is too small so let's just start from the beginning
+				seekInfo = &tail.SeekInfo{
+					Offset: 0,
+					Whence: io.SeekStart,
+				}
+			} else {
+				seekInfo = &tail.SeekInfo{
+					Offset: -1024 * 1024,
+					Whence: io.SeekEnd,
+				}
 			}
 		}
 		t, err := tail.TailFile(filename, tail.Config{
