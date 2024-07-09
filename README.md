@@ -43,6 +43,15 @@ Usage of ./ayano:
 > ./ayano -n 100 -analyse /var/log/nginx/access_json.log
 ```
 
+By default, it would output like this every 5 seconds:
+
+```
+2024/07/10 00:13:48 2222:222:2222::/48 (active, 1): 457 MiB 2 228 MiB /some/big/file (from 6 seconds ago, last accessed 6 seconds ago)
+2024/07/10 00:13:48 111.11.111.0/24: 268 MiB 1 268 MiB /another/big/file (from 13 seconds ago, last accessed 13 seconds ago)
+```
+
+`457 MiB 2 228 MiB` means it downloads 457 MiB large files in total, with 2 requests and 228 MiB on average.
+
 ### Daemon mode (experimental)
 
 Daemon mode is a simple log output mode that intended to work with fail2ban.
