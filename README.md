@@ -32,7 +32,7 @@ Usage of ./ayano:
   -server string
         Server IP to filter (nginx-json only)
   -threshold string
-        Threshold size for request (only requests greater than or equal to this will be counted) (default "100M")
+        Threshold size for request (only requests greater than or equal to this will be counted) (default "10M")
   -whole
         Analyze whole log file and then tail it
 > # Example 1
