@@ -200,8 +200,10 @@ func loop(iterator FileIterator, logParser Parser) {
 
 		logItem, err = logParser.Parse(line)
 		if err != nil {
-			log.Printf("parse error: %v\n", err)
-			log.Printf("got line: %s\n", line)
+			if err != ErrExpectedIgnoredLog {
+				log.Printf("parse error: %v\n", err)
+				log.Printf("got line: %s\n", line)
+			}
 			continue
 		}
 		if *server != "" && logItem.Server != *server {
@@ -338,7 +340,7 @@ func main() {
 	logOutput = flag.String("outlog", "", "Change log output file")
 	flag.Parse()
 
-	if *parser != "nginx-json" && *parser != "nginx-combined" {
+	if *parser != "nginx-json" && *parser != "nginx-combined" && *parser != "caddy-json" {
 		log.Fatal("Invalid parser")
 	}
 
@@ -395,6 +397,8 @@ func main() {
 		logParser = NginxJSONParser{}
 	} else if *parser == "nginx-combined" {
 		logParser = NginxCombinedParser{}
+	} else if *parser == "caddy-json" {
+		logParser = CaddyJSONParser{}
 	}
 
 	if *daemon {

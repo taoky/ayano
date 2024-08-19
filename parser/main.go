@@ -1,6 +1,9 @@
 package parser
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
 type LogItem struct {
 	Size   uint64
@@ -9,6 +12,8 @@ type LogItem struct {
 	URL    string
 	Server string
 }
+
+var ErrExpectedIgnoredLog = errors.New("ignored")
 
 type Parser interface {
 	Parse(line []byte) (LogItem, error)

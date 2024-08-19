@@ -4,7 +4,7 @@ Follow nginx log, and find out bad guys! Ayano parses nginx log and shows client
 
 ## Build
 
-```
+```sh
 CGO_ENABLED=0 go build
 ```
 
@@ -45,7 +45,7 @@ Usage of ./ayano:
 
 By default, it would output like this every 5 seconds:
 
-```
+```console
 2024/07/10 00:13:48 2222:222:2222::/48 (active, 1): 457 MiB 2 228 MiB /some/big/file (from 6 seconds ago, last accessed 6 seconds ago)
 2024/07/10 00:13:48 111.11.111.0/24: 268 MiB 1 268 MiB /another/big/file (from 13 seconds ago, last accessed 13 seconds ago)
 ```
@@ -102,6 +102,15 @@ Ayano supports two types of nginx log:
         '"user_agent":"$http_user_agent"'
         '}';
     ```
+
+3. Caddy default JSON format like [this](https://caddyserver.com/docs/logging#structured-logs):
+
+      ```json
+      {"level":"info","ts":1646861401.5241024,"logger":"http.log.access","msg":"handled request","request":{"remote_ip":"127.0.0.1","remote_port":"41342","client_ip":"127.0.0.1","proto":"HTTP/2.0","method":"GET","host":"localhost","uri":"/","headers":{"User-Agent":["curl/7.82.0"],"Accept":["*/*"],"Accept-Encoding":["gzip, deflate, br"]},"tls":{"resumed":false,"version":772,"cipher_suite":4865,"proto":"h2","server_name":"example.com"}},"bytes_read": 0,"user_id":"","duration":0.000929675,"size":10900,"status":200,"resp_headers":{"Server":["Caddy"],"Content-Encoding":["gzip"],"Content-Type":["text/html; charset=utf-8"],"Vary":["Accept-Encoding"]}}
+      ```
+
+      > [!IMPORTANT]
+      > If you are using Caddy behind a reverse proxy, please upgrade Caddy to 2.7.0+ and set `trusted_proxies` (and `client_ip_headers`) in configuration file to let log have `client_ip` field outputted.
 
 ## Naming
 
