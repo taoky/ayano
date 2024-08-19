@@ -210,7 +210,7 @@ func loop(iterator FileIterator, logParser Parser) {
 			continue
 		}
 		size := logItem.Size
-		if size <= thresholdBytes {
+		if size < thresholdBytes {
 			continue
 		}
 		clientip_str := logItem.Client
@@ -333,7 +333,7 @@ func main() {
 	whole = flag.Bool("whole", false, "Analyze whole log file and then tail it")
 	noNetstat = flag.Bool("no-netstat", false, "Do not detect active connections")
 	parser = flag.String("parser", "nginx-json", "Parser to use (nginx-json/nginx-combined/caddy-json)")
-	threshold = flag.String("threshold", "100M", "Threshold size for request (only requests larger than this will be counted)")
+	threshold = flag.String("threshold", "100M", "Threshold size for request (only requests greater than or equal to this will be counted)")
 	server = flag.String("server", "", "Server IP to filter (nginx-json only)")
 	analyse = flag.Bool("analyse", false, "Log analyse mode (no tail following, only show top N at the end, and implies -whole)")
 	daemon = flag.Bool("daemon", false, "Daemon mode, prints out IP cidr and total size every 1GiB")
