@@ -332,7 +332,7 @@ func main() {
 	absoluteItemTime = flag.Bool("absolute", false, "Show absolute time for each item")
 	whole = flag.Bool("whole", false, "Analyze whole log file and then tail it")
 	noNetstat = flag.Bool("no-netstat", false, "Do not detect active connections")
-	parser = flag.String("parser", "nginx-json", "Parser to use (nginx-json or nginx-combined)")
+	parser = flag.String("parser", "nginx-json", "Parser to use (nginx-json/nginx-combined/caddy-json)")
 	threshold = flag.String("threshold", "100M", "Threshold size for request (only requests larger than this will be counted)")
 	server = flag.String("server", "", "Server IP to filter (nginx-json only)")
 	analyse = flag.Bool("analyse", false, "Log analyse mode (no tail following, only show top N at the end, and implies -whole)")

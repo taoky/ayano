@@ -26,7 +26,7 @@ Usage of ./ayano:
   -outlog string
         Change log output file
   -parser string
-        Parser to use (nginx-json or nginx-combined) (default "nginx-json")
+        Parser to use (nginx-json/nginx-combined/caddy-json) (default "nginx-json")
   -r int
         Refresh interval in seconds (default 5)
   -server string
