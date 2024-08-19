@@ -3,11 +3,7 @@ package parser
 import (
 	"math"
 	"time"
-
-	jsoniter "github.com/json-iterator/go"
 )
-
-var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type NginxJSONParser struct{}
 

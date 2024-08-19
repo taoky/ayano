@@ -3,7 +3,11 @@ package parser
 import (
 	"errors"
 	"time"
+
+	jsoniter "github.com/json-iterator/go"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type LogItem struct {
 	Size   uint64
