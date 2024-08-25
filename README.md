@@ -4,43 +4,48 @@ Follow nginx log, and find out bad guys! Ayano parses nginx log and shows client
 
 ## Build
 
-```
+```shell
 CGO_ENABLED=0 go build
 ```
 
 ## Usage
 
 ```console
-> ./ayano -h
-Usage of ./ayano:
-  -absolute
-        Show absolute time for each item
-  -analyse
-        Log analyse mode (no tail following, only show top N at the end, and implies -whole)
-  -daemon
-        Daemon mode, prints out IP cidr and total size every 1GiB
-  -n int
-        Show top N values (0 means no limit) (default 10)
-  -no-netstat
-        Do not detect active connections
-  -outlog string
-        Change log output file
-  -parser string
-        Parser to use (nginx-json or nginx-combined) (default "nginx-json")
-  -r int
-        Refresh interval in seconds (default 5)
-  -server string
-        Server IP to filter (nginx-json only)
-  -threshold string
-        Threshold size for request (only requests larger than this will be counted) (default "100M")
-  -whole
-        Analyze whole log file and then tail it
-> # Example 1
-> ./ayano -n 20 -threshold 50M /var/log/nginx/access_json.log
-> # Example 2
-> ./ayano -n 50 -whole -parser nginx-combined /var/log/nginx/access.log
-> # Example 3. This will use fast path to analyse log, and just print result and quit.
-> ./ayano -n 100 -analyse /var/log/nginx/access_json.log
+$ ./ayano
+A simple log analysis tool for Nginx, Apache, or other web server logs
+
+Usage:
+  ayano [command]
+
+Available Commands:
+  analyze     Log analyse mode (no tail following, only show top N at the end, and implies --whole)
+  daemon      Daemon mode, prints out IP CIDR and total size every 1 GiB
+  run         Run and follow the log file
+
+$ ./ayano run --help
+Run and follow the log file
+
+Usage:
+  ayano run [filename] [flags]
+
+Flags:
+  -a, --absolute         Show absolute time for each item
+  -h, --help             help for run
+      --no-netstat       Do not detect active connections
+  -o, --outlog string    Change log output file
+  -p, --parser string    Log parser (nginx-combined|nginx-json) (default "nginx-json")
+  -r, --refresh int      Refresh interval in seconds (default 5)
+  -s, --server string    Server IP to filter (nginx-json only)
+  -t, --threshold size   Threshold size for request (only requests larger than this will be counted) (default 105 MB)
+  -n, --top int          Number of top items to show (default 10)
+  -w, --whole            Analyze whole log file and then tail it
+
+# Example 1
+$ ./ayano run -n 20 --threshold 50M /var/log/nginx/access_json.log
+# Example 2
+$ ./ayano run -n 50 --whole --parser nginx-combined /var/log/nginx/access.log
+# Example 3. This will use fast path to analyse log, and just print result and quit.
+$ ./ayano analyze -n 100 /var/log/nginx/access_json.log
 ```
 
 By default, it would output like this every 5 seconds:
@@ -108,4 +113,3 @@ Ayano supports two types of nginx log:
 Ayano is named after *Sugiura Ayano*, the Student Council vice-president in [*Yuru Yuri*](https://en.wikipedia.org/wiki/YuruYuri#Student_Council).
 
 Also, if you want something easier to use than iftop... Please try my new little project [chitose](https://github.com/taoky/chitose)!
-

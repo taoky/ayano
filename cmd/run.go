@@ -77,8 +77,8 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 
 func runCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run",
-		Short: "Run the server",
+		Use:   "run [filename]",
+		Short: "Run and follow the log file",
 		Args:  cobra.MaximumNArgs(1),
 	}
 	config := analyze.DefaultConfig()
@@ -91,7 +91,7 @@ func runCmd() *cobra.Command {
 
 func analyzeCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "analyze",
+		Use:     "analyze [filename]",
 		Aliases: []string{"analyse"},
 		Short:   "Log analyse mode (no tail following, only show top N at the end, and implies --whole)",
 		Args:    cobra.MaximumNArgs(1),
@@ -107,8 +107,8 @@ func analyzeCmd() *cobra.Command {
 
 func daemonCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "daemon",
-		Short: "Daemon mode, prints out IP cidr and total size every 1 GiB",
+		Use:   "daemon [filename]",
+		Short: "Daemon mode, prints out IP CIDR and total size every 1 GiB",
 		Args:  cobra.MaximumNArgs(1),
 	}
 	config := analyze.DefaultConfig()
