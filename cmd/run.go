@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"net/netip"
 	"os"
 	"os/signal"
@@ -33,41 +32,26 @@ func printTopValuesRoutine(a *analyze.Analyzer) {
 	}
 }
 
-var logFile *os.File
-
-func setLogOutput(filename string) {
-	var err error
-	logFile, err = os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.SetOutput(logFile)
-}
-
 func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerConfig) error {
-	if config.LogOutput != "" {
-		setLogOutput(config.LogOutput)
-
-		// setup SIGHUP to reopen log file
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, syscall.SIGHUP)
-		go func() {
-			for range c {
-				systemd.MustNotifyReloading()
-				setLogOutput(config.LogOutput)
-				// Let GC close the old file
-				runtime.GC()
-				systemd.MustNotifyReady()
-			}
-		}()
-	}
-
 	filename := filenameFromArgs(args)
 	fmt.Fprintln(cmd.ErrOrStderr(), "Using log file:", filename)
 	analyzer, err := analyze.NewAnalyzer(config)
 	if err != nil {
 		return fmt.Errorf("failed to create analyzer: %w", err)
 	}
+
+	// setup SIGHUP to reopen log file
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGHUP)
+	go func() {
+		for range c {
+			systemd.MustNotifyReloading()
+			analyzer.OpenLogFile()
+			// Let GC close the old file
+			runtime.GC()
+			systemd.MustNotifyReady()
+		}
+	}()
 
 	iterator, err := analyzer.OpenFileIterator(filename)
 	if err != nil {

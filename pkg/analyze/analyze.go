@@ -105,7 +105,7 @@ func NewAnalyzer(c AnalyzerConfig) (*Analyzer, error) {
 			return nil, fmt.Errorf("open log file error: %w", err)
 		}
 		c.LogOutput = f.Name()
-		logger = log.New(f, "", log.LstdFlags)
+		logger.SetOutput(f)
 	}
 
 	return &Analyzer{
@@ -193,7 +193,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time) {
 			return s.State == netstat.Established
 		})
 		if err != nil {
-			log.Printf("netstat error: %v", err)
+			a.logger.Printf("netstat error: %v", err)
 		} else {
 			for _, tab := range tabs {
 				ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
@@ -207,7 +207,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time) {
 			return s.State == netstat.Established
 		})
 		if err != nil {
-			log.Printf("netstat error: %v", err)
+			a.logger.Printf("netstat error: %v", err)
 		} else {
 			for _, tab := range tabs {
 				ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
@@ -284,7 +284,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time) {
 				connection = "     "
 			}
 		}
-		log.Printf("%s%16s%s: %7s %3d %7s %s (from %s, last accessed %s)%s\n", fmtStart, key, connection, humanize.IBytes(total), reqTotal,
+		a.logger.Printf("%s%16s%s: %7s %3d %7s %s (from %s, last accessed %s)%s\n", fmtStart, key, connection, humanize.IBytes(total), reqTotal,
 			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime, fmtEnd)
 		if displayRecord != nil {
 			displayRecord[key] = ipStats.LastURLAccess
