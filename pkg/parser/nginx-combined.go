@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"strconv"
+	"time"
 )
 
 func init() {
@@ -13,6 +14,13 @@ func init() {
 	RegisterParser("combined", func() Parser {
 		return NginxCombinedParser{}
 	})
+}
+
+const CommonLogFormat = "02/Jan/2006:15:04:05 -0700"
+
+func clfDateParse(s []byte) time.Time {
+	t, _ := time.Parse(CommonLogFormat, string(s))
+	return t
 }
 
 type NginxCombinedParser struct{}
