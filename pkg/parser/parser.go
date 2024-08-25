@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/grafana/grafana-plugin-sdk-go/data/utils/jsoniter"
+	jsoniter "github.com/json-iterator/go"
 )
 
 type LogItem struct {
