@@ -2,7 +2,6 @@ package analyze
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net/netip"
 	"os"
@@ -99,7 +98,7 @@ func NewAnalyzer(c AnalyzerConfig) (*Analyzer, error) {
 		c.Whole = true
 	}
 
-	logger := log.New(io.Discard, "", log.LstdFlags)
+	logger := log.New(os.Stdout, "", log.LstdFlags)
 	if c.LogOutput != "" {
 		f, err := os.OpenFile(c.LogOutput, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {

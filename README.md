@@ -50,7 +50,7 @@ $ ./ayano analyze -n 100 /var/log/nginx/access_json.log
 
 By default, it would output like this every 5 seconds:
 
-```
+```log
 2024/07/10 00:13:48 2222:222:2222::/48 (active, 1): 457 MiB 2 228 MiB /some/big/file (from 6 seconds ago, last accessed 6 seconds ago)
 2024/07/10 00:13:48 111.11.111.0/24: 268 MiB 1 268 MiB /another/big/file (from 13 seconds ago, last accessed 13 seconds ago)
 ```
