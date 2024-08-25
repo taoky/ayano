@@ -33,7 +33,7 @@ Flags:
   -h, --help             help for run
       --no-netstat       Do not detect active connections
   -o, --outlog string    Change log output file
-  -p, --parser string    Log parser (nginx-combined|nginx-json|caddy-json) (default "nginx-json")
+  -p, --parser string    Log parser (nginx-combined|nginx-json|caddy-json|goaccess) (default "nginx-json")
   -r, --refresh int      Refresh interval in seconds (default 5)
   -s, --server string    Server IP to filter (nginx-json only)
   -t, --threshold size   Threshold size for request (only requests at least this large will be counted) (default 10 MB)
@@ -116,6 +116,8 @@ Ayano supports two types of nginx log:
 
 > [!IMPORTANT]
 > If you are using Caddy behind a reverse proxy, please upgrade Caddy to 2.7.0+ and set `trusted_proxies` (and `client_ip_headers`) in configuration file to let log have `client_ip` field outputted.
+
+4. GoAccess format string. You shall set `GOACCESS_CONFIG` env to a goaccess config file beforehand ([format recognized](https://github.com/taoky/goaccessfmt?tab=readme-ov-file#config-file-format), [example](assets/goaccess.conf)).
 
 ## Naming
 
