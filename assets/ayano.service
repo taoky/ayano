@@ -5,7 +5,7 @@ Description=Nginx log analyzer for OSS mirrors, working with fail2ban
 Restart=on-failure
 StartLimitInterval=10s
 MemoryMax=5G
-ExecStart=/usr/local/bin/ayano -daemon -outlog /var/log/ayano/record.log -parser nginx-combined /var/log/nginx/access.log
+ExecStart=/usr/local/bin/ayano daemon --outlog /var/log/ayano/record.log --parser nginx-combined /var/log/nginx/access.log
 
 # Systemd in Debian Bookworm does not support notify-reload
 # Type=notify-reload

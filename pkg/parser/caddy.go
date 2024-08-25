@@ -5,6 +5,15 @@ import (
 	"time"
 )
 
+func init() {
+	RegisterParser("caddy-json", func() Parser {
+		return CaddyJSONParser{}
+	})
+	RegisterParser("caddy", func() Parser {
+		return CaddyJSONParser{}
+	})
+}
+
 type CaddyJSONParser struct{}
 
 type CaddyJsonLogRequest struct {

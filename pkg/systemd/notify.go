@@ -1,6 +1,4 @@
-// Systemd notify-reload support
-
-package main
+package systemd
 
 import (
 	"errors"
@@ -11,12 +9,12 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func SdNotifyReady() error {
-	return SdNotify("READY=1")
+func NotifyReady() error {
+	return Notify("READY=1")
 }
 
-func MustSdNotifyReady() {
-	if err := SdNotifyReady(); err != nil {
+func MustNotifyReady() {
+	if err := NotifyReady(); err != nil {
 		panic(err)
 	}
 }
@@ -30,22 +28,22 @@ func getMonoTime() (uint64, error) {
 	return uint64(ts.Sec)*1e6 + uint64(ts.Nsec)/1e3, nil
 }
 
-func SdNotifyReloading() error {
+func NotifyReloading() error {
 	microsecs, err := getMonoTime()
 	if err != nil {
 		return err
 	}
 	msg := fmt.Sprintf("RELOADING=1\nRELOAD_TIMESTAMP=%d", microsecs)
-	return SdNotify(msg)
+	return Notify(msg)
 }
 
-func MustSdNotifyReloading() {
-	if err := SdNotifyReloading(); err != nil {
+func MustNotifyReloading() {
+	if err := NotifyReloading(); err != nil {
 		panic(err)
 	}
 }
 
-func SdNotify(message string) error {
+func Notify(message string) error {
 	if len(message) == 0 {
 		return errors.New("requires a message")
 	}

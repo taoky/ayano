@@ -1,4 +1,4 @@
-package main
+package fileiter
 
 import (
 	"bufio"
@@ -6,7 +6,7 @@ import (
 	"github.com/nxadm/tail"
 )
 
-type FileIterator interface {
+type Iterator interface {
 	Next() ([]byte, error)
 }
 
@@ -14,7 +14,7 @@ type scannerIterator struct {
 	scanner *bufio.Scanner
 }
 
-func NewFileIteratorWithScanner(scanner *bufio.Scanner) FileIterator {
+func NewWithScanner(scanner *bufio.Scanner) Iterator {
 	// Prepare a large buffer
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 	return &scannerIterator{scanner: scanner}
@@ -36,6 +36,6 @@ func (t tailIterator) Next() ([]byte, error) {
 	return []byte((<-t.tail.Lines).Text), nil
 }
 
-func NewFileIteratorWithTail(tail *tail.Tail) FileIterator {
+func NewWithTail(tail *tail.Tail) Iterator {
 	return &tailIterator{tail: tail}
 }

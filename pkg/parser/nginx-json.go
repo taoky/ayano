@@ -5,6 +5,15 @@ import (
 	"time"
 )
 
+func init() {
+	RegisterParser("nginx-json", func() Parser {
+		return NginxJSONParser{}
+	})
+	RegisterParser("ngx_json", func() Parser {
+		return NginxJSONParser{}
+	})
+}
+
 type NginxJSONParser struct{}
 
 type NginxJSONLog struct {
