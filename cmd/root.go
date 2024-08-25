@@ -1,6 +1,8 @@
 package cmd
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/spf13/cobra"
+)
 
 func showHelp(cmd *cobra.Command, args []string) error {
 	return cmd.Help()
@@ -13,6 +15,10 @@ func RootCmd() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE:  showHelp,
 	}
-	rootCmd.AddCommand(runCmd())
+	rootCmd.AddCommand(
+		runCmd(),
+		analyzeCmd(),
+		daemonCmd(),
+	)
 	return rootCmd
 }

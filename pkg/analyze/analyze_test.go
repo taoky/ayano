@@ -28,13 +28,13 @@ func benchmarkAnalyzeLoop(b *testing.B, parserStr string) {
 		b.Fatal(err)
 	}
 
-	t, err := openFileIterator(logPath)
+	t, err := a.OpenFileIterator(logPath)
 	if err != nil {
 		b.Fatal(err)
 	}
 
 	a.RunLoop(t)
-	printTopValues(nil, false)
+	a.PrintTopValues(nil)
 }
 
 func BenchmarkAnalyzeLoopNgxJSON(b *testing.B) {

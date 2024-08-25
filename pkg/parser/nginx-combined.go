@@ -6,6 +6,15 @@ import (
 	"strconv"
 )
 
+func init() {
+	RegisterParser("nginx-combined", func() Parser {
+		return NginxCombinedParser{}
+	})
+	RegisterParser("combined", func() Parser {
+		return NginxCombinedParser{}
+	})
+}
+
 type NginxCombinedParser struct{}
 
 func (p NginxCombinedParser) Parse(line []byte) (LogItem, error) {

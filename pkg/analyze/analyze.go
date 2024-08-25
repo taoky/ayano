@@ -6,15 +6,39 @@ import (
 	"log"
 	"net/netip"
 	"os"
+	"slices"
 	"sync"
+	"time"
 
+	"github.com/cakturk/go-netstat/netstat"
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/pflag"
 	"github.com/taoky/ayano/pkg/fileiter"
 	"github.com/taoky/ayano/pkg/parser"
 )
 
-const oneGB = 1 << 30
+const (
+	oneGB = 1 << 30
+
+	boldStart = "\x1B[1m"
+	boldEnd   = "\x1B[22m"
+
+	TimeFormat = time.DateTime
+)
+
+type IPStats struct {
+	Size      uint64
+	Requests  uint64
+	LastURL   string
+	LastSize  uint64
+	FirstSeen time.Time
+
+	// Record time of last URL change
+	LastURLUpdate time.Time
+
+	// Record time of last URL access
+	LastURLAccess time.Time
+}
 
 type Analyzer struct {
 	Config AnalyzerConfig
@@ -70,6 +94,10 @@ func NewAnalyzer(c AnalyzerConfig) (*Analyzer, error) {
 		return nil, fmt.Errorf("invalid parser: %w", err)
 	}
 
+	if c.Analyze {
+		c.Whole = true
+	}
+
 	logger := log.New(io.Discard, "", log.LstdFlags)
 	if c.LogOutput != "" {
 		f, err := os.OpenFile(c.LogOutput, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -99,7 +127,7 @@ func (a *Analyzer) RunLoop(iter fileiter.Iterator) error {
 		}
 		if err := a.handleLine(line); err != nil {
 			// TODO: replace with logger
-			a.logger.Println("analyze error: %v", err)
+			a.logger.Printf("analyze error: %v", err)
 		}
 	}
 	return nil
@@ -149,10 +177,117 @@ func (a *Analyzer) handleLine(line []byte) error {
 			a.logger.Printf("%s %s %s %s",
 				clientPrefix.String(),
 				humanize.IBytes(ipStats.Size),
-				ipStats.FirstSeen.Format(DateFormat),
+				ipStats.FirstSeen.Format(TimeFormat),
 				url)
 		}
 		ipStats.LastSize = ipStats.Size
 	}
+	a.ipInfo[clientPrefix] = ipStats
 	return nil
+}
+func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time) {
+	activeConn := make(map[netip.Prefix]int)
+	if !a.Config.NoNetstat {
+		// Get active connections
+		tabs, err := netstat.TCPSocks(func(s *netstat.SockTabEntry) bool {
+			return s.State == netstat.Established
+		})
+		if err != nil {
+			log.Printf("netstat error: %v", err)
+		} else {
+			for _, tab := range tabs {
+				ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
+				if !ok {
+					continue
+				}
+				activeConn[IPPrefix(ip)] += 1
+			}
+		}
+		tabs, err = netstat.TCP6Socks(func(s *netstat.SockTabEntry) bool {
+			return s.State == netstat.Established
+		})
+		if err != nil {
+			log.Printf("netstat error: %v", err)
+		} else {
+			for _, tab := range tabs {
+				ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
+				if !ok {
+					continue
+				}
+				activeConn[IPPrefix(ip)] += 1
+			}
+		}
+	}
+
+	if a.Config.UseLock() {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+	}
+
+	// sort stats key by value
+	keys := make([]netip.Prefix, 0, len(a.ipInfo))
+	for k := range a.ipInfo {
+		keys = append(keys, k)
+	}
+	slices.SortFunc(keys, func(l, r netip.Prefix) int {
+		return int(a.ipInfo[r].Size - a.ipInfo[l].Size)
+	})
+
+	// print top N
+	top := a.Config.TopN
+	if len(keys) < a.Config.TopN {
+		top = len(keys)
+	} else if a.Config.TopN == 0 {
+		// no limit
+		top = len(keys)
+	}
+
+	for i := range top {
+		key := keys[i]
+		ipStats := a.ipInfo[key]
+		total := ipStats.Size
+		reqTotal := ipStats.Requests
+		last := ipStats.LastURL
+
+		var lastUpdateTime string
+		var lastAccessTime string
+		if a.Config.Absolute {
+			lastUpdateTime = ipStats.LastURLUpdate.Format(TimeFormat)
+			lastAccessTime = ipStats.LastURLAccess.Format(TimeFormat)
+		} else {
+			lastUpdateTime = humanize.Time(ipStats.LastURLUpdate)
+			lastAccessTime = humanize.Time(ipStats.LastURLAccess)
+		}
+
+		average := total / uint64(reqTotal)
+
+		fmtStart := ""
+		fmtEnd := ""
+		connection := ""
+		boldLine := false
+
+		if displayRecord != nil && displayRecord[key] != ipStats.LastURLAccess {
+			// display this line in bold
+			fmtStart = boldStart
+			fmtEnd = boldEnd
+			boldLine = true
+		}
+		if !a.Config.NoNetstat {
+			if _, ok := activeConn[key]; ok {
+				activeString := fmt.Sprintf(" (%2d)", activeConn[key])
+				if !boldLine {
+					connection = fmt.Sprintf("%s%s%s", boldStart, activeString, boldEnd)
+				} else {
+					connection = activeString
+				}
+			} else {
+				connection = "     "
+			}
+		}
+		log.Printf("%s%16s%s: %7s %3d %7s %s (from %s, last accessed %s)%s\n", fmtStart, key, connection, humanize.IBytes(total), reqTotal,
+			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime, fmtEnd)
+		if displayRecord != nil {
+			displayRecord[key] = ipStats.LastURLAccess
+		}
+	}
 }
