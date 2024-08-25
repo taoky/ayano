@@ -68,10 +68,10 @@ func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet) {
 	flags.BoolVarP(&c.Absolute, "absolute", "a", c.Absolute, "Show absolute time for each item")
 	flags.StringVarP(&c.LogOutput, "outlog", "o", c.LogOutput, "Change log output file")
 	flags.BoolVarP(&c.NoNetstat, "no-netstat", "", c.NoNetstat, "Do not detect active connections")
-	flags.StringVarP(&c.Parser, "parser", "p", c.Parser, "Log parser (nginx-combined|nginx-json)")
+	flags.StringVarP(&c.Parser, "parser", "p", c.Parser, "Log parser (nginx-combined|nginx-json|caddy-json)")
 	flags.IntVarP(&c.RefreshSec, "refresh", "r", c.RefreshSec, "Refresh interval in seconds")
 	flags.StringVarP(&c.Server, "server", "s", c.Server, "Server IP to filter (nginx-json only)")
-	flags.VarP(&c.Threshold, "threshold", "t", "Threshold size for request (only requests larger than this will be counted)")
+	flags.VarP(&c.Threshold, "threshold", "t", "Threshold size for request (only requests at least this large will be counted)")
 	flags.IntVarP(&c.TopN, "top", "n", c.TopN, "Number of top items to show")
 	flags.BoolVarP(&c.Whole, "whole", "w", c.Whole, "Analyze whole log file and then tail it")
 }
@@ -83,7 +83,7 @@ func DefaultConfig() AnalyzerConfig {
 	return AnalyzerConfig{
 		Parser:     "nginx-json",
 		RefreshSec: 5,
-		Threshold:  SizeFlag(100 * 1024 * 1024),
+		Threshold:  SizeFlag(10e6),
 		TopN:       10,
 	}
 }

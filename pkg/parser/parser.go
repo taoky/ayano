@@ -3,6 +3,8 @@ package parser
 import (
 	"errors"
 	"time"
+
+	"github.com/grafana/grafana-plugin-sdk-go/data/utils/jsoniter"
 )
 
 type LogItem struct {
@@ -19,7 +21,12 @@ type Parser interface {
 
 type NewFunc func() Parser
 
-var registry = make(map[string]NewFunc)
+var (
+	json                  = jsoniter.ConfigCompatibleWithStandardLibrary
+	ErrExpectedIgnoredLog = errors.New("ignored")
+
+	registry = make(map[string]NewFunc)
+)
 
 func RegisterParser(name string, newFunc NewFunc) {
 	registry[name] = newFunc

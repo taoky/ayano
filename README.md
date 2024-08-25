@@ -33,10 +33,10 @@ Flags:
   -h, --help             help for run
       --no-netstat       Do not detect active connections
   -o, --outlog string    Change log output file
-  -p, --parser string    Log parser (nginx-combined|nginx-json) (default "nginx-json")
+  -p, --parser string    Log parser (nginx-combined|nginx-json|caddy-json) (default "nginx-json")
   -r, --refresh int      Refresh interval in seconds (default 5)
   -s, --server string    Server IP to filter (nginx-json only)
-  -t, --threshold size   Threshold size for request (only requests larger than this will be counted) (default 105 MB)
+  -t, --threshold size   Threshold size for request (only requests at least this large will be counted) (default 10 MB)
   -n, --top int          Number of top items to show (default 10)
   -w, --whole            Analyze whole log file and then tail it
 
@@ -107,6 +107,15 @@ Ayano supports two types of nginx log:
         '"user_agent":"$http_user_agent"'
         '}';
     ```
+
+3. Caddy default JSON format like [this](https://caddyserver.com/docs/logging#structured-logs):
+
+      ```json
+      {"level":"info","ts":1646861401.5241024,"logger":"http.log.access","msg":"handled request","request":{"remote_ip":"127.0.0.1","remote_port":"41342","client_ip":"127.0.0.1","proto":"HTTP/2.0","method":"GET","host":"localhost","uri":"/","headers":{"User-Agent":["curl/7.82.0"],"Accept":["*/*"],"Accept-Encoding":["gzip, deflate, br"]},"tls":{"resumed":false,"version":772,"cipher_suite":4865,"proto":"h2","server_name":"example.com"}},"bytes_read": 0,"user_id":"","duration":0.000929675,"size":10900,"status":200,"resp_headers":{"Server":["Caddy"],"Content-Encoding":["gzip"],"Content-Type":["text/html; charset=utf-8"],"Vary":["Accept-Encoding"]}}
+      ```
+
+> [!IMPORTANT]
+> If you are using Caddy behind a reverse proxy, please upgrade Caddy to 2.7.0+ and set `trusted_proxies` (and `client_ip_headers`) in configuration file to let log have `client_ip` field outputted.
 
 ## Naming
 

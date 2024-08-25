@@ -3,8 +3,6 @@ package parser
 import (
 	"math"
 	"time"
-
-	jsoniter "github.com/json-iterator/go"
 )
 
 func init() {
@@ -15,8 +13,6 @@ func init() {
 		return NginxJSONParser{}
 	})
 }
-
-var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type NginxJSONParser struct{}
 
