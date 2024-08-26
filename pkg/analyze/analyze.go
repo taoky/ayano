@@ -42,8 +42,9 @@ type IPStats struct {
 type Analyzer struct {
 	Config AnalyzerConfig
 
-	ipInfo map[netip.Prefix]IPStats
-	mu     sync.Mutex
+	// [server][ip prefix] -> IPStats
+	serverIpInfo map[string]map[netip.Prefix]IPStats
+	mu           sync.Mutex
 
 	logParser parser.Parser
 	logger    *log.Logger
@@ -112,10 +113,10 @@ func NewAnalyzer(c AnalyzerConfig) (*Analyzer, error) {
 	}
 
 	return &Analyzer{
-		Config:    c,
-		ipInfo:    make(map[netip.Prefix]IPStats),
-		logParser: logParser,
-		logger:    logger,
+		Config:       c,
+		serverIpInfo: make(map[string]map[netip.Prefix]IPStats),
+		logParser:    logParser,
+		logger:       logger,
 	}, nil
 }
 
@@ -141,9 +142,9 @@ func (a *Analyzer) handleLine(line []byte) error {
 	if err != nil {
 		return fmt.Errorf("parse error: %w\ngot line: %s", err, line)
 	}
-	if a.Config.Server != "" && logItem.Server != a.Config.Server {
-		return nil
-	}
+	// if a.Config.Server != "" && logItem.Server != a.Config.Server {
+	// 	return nil
+	// }
 	size := logItem.Size
 	if size < uint64(a.Config.Threshold) {
 		return nil
@@ -158,7 +159,7 @@ func (a *Analyzer) handleLine(line []byte) error {
 		a.mu.Lock()
 		defer a.mu.Unlock()
 	}
-	ipStats := a.ipInfo[clientPrefix]
+	ipStats := a.serverIpInfo[logItem.Server][clientPrefix]
 
 	ipStats.Size += size
 	ipStats.Requests += 1
@@ -185,9 +186,15 @@ func (a *Analyzer) handleLine(line []byte) error {
 		}
 		ipStats.LastSize = ipStats.Size
 	}
-	a.ipInfo[clientPrefix] = ipStats
+	a.serverIpInfo[logItem.Server][clientPrefix] = ipStats
 	return nil
 }
+
+type KeyIndex struct {
+	Server string
+	Prefix netip.Prefix
+}
+
 func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sortBy string) {
 	activeConn := make(map[netip.Prefix]int)
 	if !a.Config.NoNetstat {
@@ -228,11 +235,17 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 	}
 
 	// sort stats key by value
-	keys := make([]netip.Prefix, 0, len(a.ipInfo))
-	for k := range a.ipInfo {
-		keys = append(keys, k)
+	keys := make([]KeyIndex, 0)
+	for s := range a.serverIpInfo {
+		// TODO: Adjust this filter by user interaction in TUI
+		if a.Config.Server != "" && s != a.Config.Server {
+			continue
+		}
+		for k := range a.serverIpInfo[s] {
+			keys = append(keys, KeyIndex{s, k})
+		}
 	}
-	sortFunc := GetSortFunc(sortBy, a.ipInfo)
+	sortFunc := GetSortFunc(sortBy, a.serverIpInfo)
 	if sortFunc != nil {
 		slices.SortFunc(keys, sortFunc)
 	}
@@ -248,7 +261,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 
 	for i := range top {
 		key := keys[i]
-		ipStats := a.ipInfo[key]
+		ipStats := a.serverIpInfo[key.Server][key.Prefix]
 		total := ipStats.Size
 		reqTotal := ipStats.Requests
 		last := ipStats.LastURL
@@ -270,15 +283,15 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		connection := ""
 		boldLine := false
 
-		if displayRecord != nil && displayRecord[key] != ipStats.LastURLAccess {
+		if displayRecord != nil && displayRecord[key.Prefix] != ipStats.LastURLAccess {
 			// display this line in bold
 			fmtStart = boldStart
 			fmtEnd = boldEnd
 			boldLine = true
 		}
 		if !a.Config.NoNetstat {
-			if _, ok := activeConn[key]; ok {
-				activeString := fmt.Sprintf(" (%2d)", activeConn[key])
+			if _, ok := activeConn[key.Prefix]; ok {
+				activeString := fmt.Sprintf(" (%2d)", activeConn[key.Prefix])
 				if !boldLine {
 					connection = fmt.Sprintf("%s%s%s", boldStart, activeString, boldEnd)
 				} else {
@@ -291,7 +304,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		a.logger.Printf("%s%16s%s: %7s %3d %7s %s (from %s, last accessed %s)%s\n", fmtStart, key, connection, humanize.IBytes(total), reqTotal,
 			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime, fmtEnd)
 		if displayRecord != nil {
-			displayRecord[key] = ipStats.LastURLAccess
+			displayRecord[key.Prefix] = ipStats.LastURLAccess
 		}
 	}
 }

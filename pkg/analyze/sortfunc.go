@@ -5,17 +5,17 @@ import (
 	"slices"
 )
 
-type SortFunc func(l, r netip.Prefix) int
+type SortFunc func(l, r KeyIndex) int
 
-var sortFuncs = map[string]func(a map[netip.Prefix]IPStats) SortFunc{
-	"size": func(i map[netip.Prefix]IPStats) SortFunc {
-		return func(l, r netip.Prefix) int {
-			return int(i[r].Size - i[l].Size)
+var sortFuncs = map[string]func(a map[string]map[netip.Prefix]IPStats) SortFunc{
+	"size": func(i map[string]map[netip.Prefix]IPStats) SortFunc {
+		return func(l, r KeyIndex) int {
+			return int(i[r.Server][r.Prefix].Size - i[l.Server][l.Prefix].Size)
 		}
 	},
-	"requests": func(i map[netip.Prefix]IPStats) SortFunc {
-		return func(l, r netip.Prefix) int {
-			return int(i[r].Requests - i[l].Requests)
+	"requests": func(i map[string]map[netip.Prefix]IPStats) SortFunc {
+		return func(l, r KeyIndex) int {
+			return int(i[r.Server][r.Prefix].Requests - i[l.Server][l.Prefix].Requests)
 		}
 	},
 }
@@ -24,7 +24,7 @@ func init() {
 	sortFuncs["reqs"] = sortFuncs["requests"]
 }
 
-func GetSortFunc(name string, i map[netip.Prefix]IPStats) SortFunc {
+func GetSortFunc(name string, i map[string]map[netip.Prefix]IPStats) SortFunc {
 	fn, ok := sortFuncs[name]
 	if !ok {
 		return nil
