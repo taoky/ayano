@@ -2,16 +2,15 @@ package cmd
 
 import (
 	"fmt"
-	"net/netip"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/taoky/ayano/pkg/analyze"
 	"github.com/taoky/ayano/pkg/systemd"
+	"github.com/taoky/ayano/pkg/tui"
 )
 
 const defaultFilename = "/var/log/nginx/mirrors/access_json.log"
@@ -21,15 +20,6 @@ func filenameFromArgs(args []string) string {
 		return defaultFilename
 	}
 	return args[0]
-}
-
-func printTopValuesRoutine(a *analyze.Analyzer) {
-	displayRecord := make(map[netip.Prefix]time.Time)
-	ticker := time.NewTicker(time.Duration(a.Config.RefreshSec) * time.Second)
-	for range ticker.C {
-		a.PrintTopValues(displayRecord, "size")
-		fmt.Println()
-	}
 }
 
 func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerConfig) error {
@@ -59,7 +49,7 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 	}
 
 	if !config.Analyze && !config.Daemon {
-		go printTopValuesRoutine(analyzer)
+		go tui.Tui(analyzer)
 	}
 	if config.Daemon {
 		if err := systemd.NotifyReady(); err != nil {
@@ -70,7 +60,7 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 	analyzer.RunLoop(iterator)
 
 	if config.Analyze {
-		analyzer.PrintTopValues(nil, config.SortBy)
+		analyzer.PrintTopValues(nil, config.SortBy, "")
 	}
 	return nil
 }
