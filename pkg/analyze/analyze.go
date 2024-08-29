@@ -342,7 +342,7 @@ func (a *Analyzer) PrintTotal() {
 		totals = append(totals, kv{server, total})
 	}
 	sort.Slice(totals, func(i, j int) bool {
-		return totals[i].value < totals[j].value
+		return totals[i].value > totals[j].value
 	})
 
 	for _, kv := range totals {

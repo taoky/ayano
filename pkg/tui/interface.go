@@ -40,18 +40,32 @@ func Tui(a *analyze.Analyzer) {
 				if len(servers) == 1 {
 					fmt.Println("Only one server", servers[0], "is available.")
 				} else if len(servers) != 0 {
-					fmt.Println("Please give the server name you want to view.")
+					fmt.Println("Please give the server name you want to view. Enter to remove filtering.")
 					// Get all servers available
 					fmt.Println("Available servers:")
 					for _, s := range servers {
 						fmt.Println(s)
 					}
 					var input string
-					_, err := fmt.Scanln(&input)
+					n, err := fmt.Scanln(&input)
 					if err != nil {
-						fmt.Println("Failed to get input:", err)
+						if n != 0 {
+							fmt.Println("Failed to get input:", err)
+						} else {
+							serverFilter = ""
+						}
 					} else {
-						serverFilter = input
+						found := false
+						for _, str := range servers {
+							if str == input {
+								found = true
+								serverFilter = input
+								break
+							}
+						}
+						if !found {
+							fmt.Println("Input does not match existing server.")
+						}
 					}
 				}
 				shallPrint = true
