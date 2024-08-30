@@ -32,13 +32,15 @@ func Tui(a *analyze.Analyzer) {
 		select {
 		case k := <-inputChan:
 			switch k {
-			case 'S':
-				fallthrough
-			case 's':
+			case 'S', 's':
 				shallPrint = false
 				servers := a.GetCurrentServers()
 				if len(servers) == 1 {
-					fmt.Println("Only one server", servers[0], "is available.")
+					serverFmt := ""
+					if len(servers[0]) > 0 {
+						serverFmt = " (" + servers[0] + ")"
+					}
+					fmt.Printf("Only one server%s is available.\n", serverFmt)
 				} else if len(servers) != 0 {
 					fmt.Println("Please give the server name you want to view. Enter to remove filtering.")
 					// Get all servers available
@@ -69,9 +71,7 @@ func Tui(a *analyze.Analyzer) {
 					}
 				}
 				shallPrint = true
-			case 'T':
-				fallthrough
-			case 't':
+			case 'T', 't':
 				if mode == TopValues {
 					mode = Total
 					fmt.Println("Switched to showing total")

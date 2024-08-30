@@ -4,16 +4,16 @@ import (
 	"slices"
 )
 
-type SortFunc func(l, r serverPrefix) int
+type SortFunc func(l, r StatKey) int
 
-var sortFuncs = map[string]func(a map[serverPrefix]IPStats) SortFunc{
-	"size": func(i map[serverPrefix]IPStats) SortFunc {
-		return func(l, r serverPrefix) int {
+var sortFuncs = map[string]func(a map[StatKey]IPStats) SortFunc{
+	"size": func(i map[StatKey]IPStats) SortFunc {
+		return func(l, r StatKey) int {
 			return int(i[r].Size - i[l].Size)
 		}
 	},
-	"requests": func(i map[serverPrefix]IPStats) SortFunc {
-		return func(l, r serverPrefix) int {
+	"requests": func(i map[StatKey]IPStats) SortFunc {
+		return func(l, r StatKey) int {
 			return int(i[r].Requests - i[l].Requests)
 		}
 	},
@@ -23,7 +23,7 @@ func init() {
 	sortFuncs["reqs"] = sortFuncs["requests"]
 }
 
-func GetSortFunc(name string, i map[serverPrefix]IPStats) SortFunc {
+func GetSortFunc(name string, i map[StatKey]IPStats) SortFunc {
 	fn, ok := sortFuncs[name]
 	if !ok {
 		return nil
