@@ -27,7 +27,7 @@ func printTopValuesRoutine(a *analyze.Analyzer) {
 	displayRecord := make(map[netip.Prefix]time.Time)
 	ticker := time.NewTicker(time.Duration(a.Config.RefreshSec) * time.Second)
 	for range ticker.C {
-		a.PrintTopValues(displayRecord)
+		a.PrintTopValues(displayRecord, "size")
 		fmt.Println()
 	}
 }
@@ -70,7 +70,7 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 	analyzer.RunLoop(iterator)
 
 	if config.Analyze {
-		analyzer.PrintTopValues(nil)
+		analyzer.PrintTopValues(nil, config.SortBy)
 	}
 	return nil
 }
