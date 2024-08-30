@@ -1,21 +1,20 @@
 package analyze
 
 import (
-	"net/netip"
 	"slices"
 )
 
-type SortFunc func(l, r KeyIndex) int
+type SortFunc func(l, r serverPrefix) int
 
-var sortFuncs = map[string]func(a map[string]map[netip.Prefix]IPStats) SortFunc{
-	"size": func(i map[string]map[netip.Prefix]IPStats) SortFunc {
-		return func(l, r KeyIndex) int {
-			return int(i[r.Server][r.Prefix].Size - i[l.Server][l.Prefix].Size)
+var sortFuncs = map[string]func(a map[serverPrefix]IPStats) SortFunc{
+	"size": func(i map[serverPrefix]IPStats) SortFunc {
+		return func(l, r serverPrefix) int {
+			return int(i[r].Size - i[l].Size)
 		}
 	},
-	"requests": func(i map[string]map[netip.Prefix]IPStats) SortFunc {
-		return func(l, r KeyIndex) int {
-			return int(i[r.Server][r.Prefix].Requests - i[l.Server][l.Prefix].Requests)
+	"requests": func(i map[serverPrefix]IPStats) SortFunc {
+		return func(l, r serverPrefix) int {
+			return int(i[r].Requests - i[l].Requests)
 		}
 	},
 }
@@ -24,7 +23,7 @@ func init() {
 	sortFuncs["reqs"] = sortFuncs["requests"]
 }
 
-func GetSortFunc(name string, i map[string]map[netip.Prefix]IPStats) SortFunc {
+func GetSortFunc(name string, i map[serverPrefix]IPStats) SortFunc {
 	fn, ok := sortFuncs[name]
 	if !ok {
 		return nil
