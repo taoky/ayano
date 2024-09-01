@@ -3,21 +3,17 @@ package tui
 import (
 	"log"
 	"os"
-	"sync/atomic"
-	"time"
 )
 
-var noPrint atomic.Bool
-
-func timerRoutine(ticker *time.Ticker, refreshChan chan<- struct{}) {
-	for range ticker.C {
-		if !noPrint.Load() {
-			refreshChan <- struct{}{}
+func (t *Tui) timerRoutine() {
+	for range t.ticker.C {
+		if !t.noPrint.Load() {
+			t.refreshChan <- struct{}{}
 		}
 	}
 }
 
-func waitForOneByte(inputChan chan<- byte) {
+func (t *Tui) waitForOneByte() {
 	oldState, err := makeRaw(int(os.Stdin.Fd()))
 	if err != nil {
 		log.Fatal(err)
@@ -36,5 +32,5 @@ func waitForOneByte(inputChan chan<- byte) {
 	if n == 0 {
 		return
 	}
-	inputChan <- b[0]
+	t.inputChan <- b[0]
 }

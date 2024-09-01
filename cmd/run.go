@@ -49,7 +49,7 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 	}
 
 	if !config.Analyze && !config.Daemon {
-		go tui.Tui(analyzer)
+		go tui.New(analyzer).Run()
 	}
 	if config.Daemon {
 		if err := systemd.NotifyReady(); err != nil {
