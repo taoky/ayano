@@ -8,10 +8,10 @@ import (
 	"github.com/taoky/ayano/pkg/analyze"
 )
 
-type showMode int
+type ShowMode int
 
 const (
-	TopValues showMode = iota
+	TopValues ShowMode = iota
 	Total
 )
 
