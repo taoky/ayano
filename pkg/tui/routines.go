@@ -8,7 +8,7 @@ import (
 
 var shallPrint = true
 
-func timerRoutine(ticker *time.Ticker, refreshChan chan struct{}) {
+func timerRoutine(ticker *time.Ticker, refreshChan chan<- struct{}) {
 	for range ticker.C {
 		if shallPrint {
 			refreshChan <- struct{}{}
@@ -16,7 +16,7 @@ func timerRoutine(ticker *time.Ticker, refreshChan chan struct{}) {
 	}
 }
 
-func waitForOneByte(inputChan chan byte) {
+func waitForOneByte(inputChan chan<- byte) {
 	oldState, err := makeRaw(int(os.Stdin.Fd()))
 	if err != nil {
 		log.Fatal(err)
