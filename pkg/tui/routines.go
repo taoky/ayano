@@ -3,14 +3,15 @@ package tui
 import (
 	"log"
 	"os"
+	"sync/atomic"
 	"time"
 )
 
-var shallPrint = true
+var noPrint atomic.Bool
 
 func timerRoutine(ticker *time.Ticker, refreshChan chan<- struct{}) {
 	for range ticker.C {
-		if shallPrint {
+		if !noPrint.Load() {
 			refreshChan <- struct{}{}
 		}
 	}

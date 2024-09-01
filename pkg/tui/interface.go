@@ -33,7 +33,7 @@ func Tui(a *analyze.Analyzer) {
 		case k := <-inputChan:
 			switch k {
 			case 'S', 's':
-				shallPrint = false
+				noPrint.Store(true)
 				servers := a.GetCurrentServers()
 				if len(servers) == 1 {
 					serverFmt := ""
@@ -70,7 +70,7 @@ func Tui(a *analyze.Analyzer) {
 						}
 					}
 				}
-				shallPrint = true
+				noPrint.Store(false)
 			case 'T', 't':
 				if mode == TopValues {
 					mode = Total
