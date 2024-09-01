@@ -39,6 +39,11 @@ type IPStats struct {
 	LastURLAccess time.Time
 }
 
+type StatKey struct {
+	Server string
+	Prefix netip.Prefix
+}
+
 type Analyzer struct {
 	Config AnalyzerConfig
 
@@ -188,11 +193,6 @@ func (a *Analyzer) handleLine(line []byte) error {
 	}
 	a.stats[StatKey{logItem.Server, clientPrefix}] = ipStats
 	return nil
-}
-
-type StatKey struct {
-	Server string
-	Prefix netip.Prefix
 }
 
 func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sortBy string, serverFilter string) {
