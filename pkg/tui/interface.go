@@ -16,21 +16,31 @@ const (
 )
 
 func Tui(a *analyze.Analyzer) {
-	// displayRecord is used to remember latest accesses time by specific IP
-	displayRecord := make(map[netip.Prefix]time.Time)
-	serverFilter := ""
-	mode := TopValues
-	ticker := time.NewTicker(time.Duration(a.Config.RefreshSec) * time.Second)
+	type TuiStatus struct {
+		// displayRecord is used to remember latest accesses time by specific IP
+		displayRecord map[netip.Prefix]time.Time
+		serverFilter  string
+		mode          ShowMode
+		ticker        *time.Ticker
+		refreshChan   chan struct{}
+		inputChan     chan byte
+	}
 
-	refreshChan := make(chan struct{})
-	inputChan := make(chan byte)
+	status := TuiStatus{
+		displayRecord: make(map[netip.Prefix]time.Time),
+		serverFilter:  "",
+		mode:          TopValues,
+		ticker:        time.NewTicker(time.Duration(a.Config.RefreshSec) * time.Second),
+		refreshChan:   make(chan struct{}),
+		inputChan:     make(chan byte),
+	}
 
-	go timerRoutine(ticker, refreshChan)
-	go waitForOneByte(inputChan)
+	go timerRoutine(status.ticker, status.refreshChan)
+	go waitForOneByte(status.inputChan)
 
 	for {
 		select {
-		case k := <-inputChan:
+		case k := <-status.inputChan:
 			switch k {
 			case 'S', 's':
 				noPrint.Store(true)
@@ -54,14 +64,14 @@ func Tui(a *analyze.Analyzer) {
 						if n != 0 {
 							fmt.Println("Failed to get input:", err)
 						} else {
-							serverFilter = ""
+							status.serverFilter = ""
 						}
 					} else {
 						found := false
 						for _, str := range servers {
 							if str == input {
 								found = true
-								serverFilter = input
+								status.serverFilter = input
 								break
 							}
 						}
@@ -72,11 +82,11 @@ func Tui(a *analyze.Analyzer) {
 				}
 				noPrint.Store(false)
 			case 'T', 't':
-				if mode == TopValues {
-					mode = Total
+				if status.mode == TopValues {
+					status.mode = Total
 					fmt.Println("Switched to showing total")
 				} else {
-					mode = TopValues
+					status.mode = TopValues
 					fmt.Println("Switched to showing top values")
 				}
 			case '?':
@@ -88,10 +98,10 @@ func Tui(a *analyze.Analyzer) {
 			}
 			// This shall always run after input is handled.
 			// Don't write "continue" above!
-			go waitForOneByte(inputChan)
-		case <-refreshChan:
-			if mode == TopValues {
-				a.PrintTopValues(displayRecord, "size", serverFilter)
+			go waitForOneByte(status.inputChan)
+		case <-status.refreshChan:
+			if status.mode == TopValues {
+				a.PrintTopValues(status.displayRecord, "size", status.serverFilter)
 			} else {
 				a.PrintTotal()
 			}
