@@ -38,7 +38,6 @@ func New(analyzer *analyze.Analyzer) *Tui {
 		analyzer:      analyzer,
 		displayRecord: make(map[netip.Prefix]time.Time),
 		mode:          TopValues,
-		ticker:        time.NewTicker(time.Duration(analyzer.Config.RefreshSec) * time.Second),
 		refreshChan:   make(chan struct{}),
 		inputChan:     make(chan byte),
 	}

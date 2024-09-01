@@ -3,9 +3,11 @@ package tui
 import (
 	"log"
 	"os"
+	"time"
 )
 
 func (t *Tui) timerRoutine() {
+	t.ticker = time.NewTicker(time.Duration(t.analyzer.Config.RefreshSec) * time.Second)
 	for range t.ticker.C {
 		if !t.noPrint.Load() {
 			t.refreshChan <- struct{}{}
