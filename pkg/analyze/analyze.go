@@ -72,7 +72,7 @@ func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet) {
 	flags.StringVarP(&c.Parser, "parser", "p", c.Parser, "Log parser (nginx-combined|nginx-json|caddy-json|goaccess)")
 	flags.IntVarP(&c.RefreshSec, "refresh", "r", c.RefreshSec, "Refresh interval in seconds")
 	flags.StringVarP(&c.Server, "server", "s", c.Server, "Server IP to filter (nginx-json only)")
-	flags.StringVarP(&c.SortBy, "sort-by", "S", c.Server, "Sort result by (size|requests)")
+	flags.StringVarP(&c.SortBy, "sort-by", "S", c.SortBy, "Sort result by (size|requests)")
 	flags.VarP(&c.Threshold, "threshold", "t", "Threshold size for request (only requests at least this large will be counted)")
 	flags.IntVarP(&c.TopN, "top", "n", c.TopN, "Number of top items to show")
 	flags.BoolVarP(&c.Whole, "whole", "w", c.Whole, "Analyze whole log file and then tail it")
