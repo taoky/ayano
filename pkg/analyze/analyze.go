@@ -62,7 +62,7 @@ type AnalyzerConfig struct {
 	Parser     string
 	RefreshSec int
 	Server     string
-	SortBy     string
+	SortBy     SortByFlag
 	Threshold  SizeFlag
 	TopN       int
 	Whole      bool
@@ -78,7 +78,7 @@ func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet) {
 	flags.StringVarP(&c.Parser, "parser", "p", c.Parser, "Log parser (nginx-combined|nginx-json|caddy-json|goaccess)")
 	flags.IntVarP(&c.RefreshSec, "refresh", "r", c.RefreshSec, "Refresh interval in seconds")
 	flags.StringVarP(&c.Server, "server", "s", c.Server, "Server IP to filter (nginx-json only)")
-	flags.StringVarP(&c.SortBy, "sort-by", "S", c.Server, "Sort result by (size|requests)")
+	flags.VarP(&c.SortBy, "sort-by", "S", "Sort result by (size|requests)")
 	flags.VarP(&c.Threshold, "threshold", "t", "Threshold size for request (only requests at least this large will be counted)")
 	flags.IntVarP(&c.TopN, "top", "n", c.TopN, "Number of top items to show")
 	flags.BoolVarP(&c.Whole, "whole", "w", c.Whole, "Analyze whole log file and then tail it")
@@ -91,7 +91,7 @@ func DefaultConfig() AnalyzerConfig {
 	return AnalyzerConfig{
 		Parser:     "nginx-json",
 		RefreshSec: 5,
-		SortBy:     "size",
+		SortBy:     SortBySize,
 		Threshold:  SizeFlag(10e6),
 		TopN:       10,
 	}
@@ -195,7 +195,7 @@ func (a *Analyzer) handleLine(line []byte) error {
 	return nil
 }
 
-func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sortBy string, serverFilter string) {
+func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag, serverFilter string) {
 	activeConn := make(map[netip.Prefix]int)
 	if !a.Config.NoNetstat {
 		// Get active connections

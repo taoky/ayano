@@ -36,6 +36,7 @@ Flags:
   -p, --parser string    Log parser (nginx-combined|nginx-json|caddy-json|goaccess) (default "nginx-json")
   -r, --refresh int      Refresh interval in seconds (default 5)
   -s, --server string    Server IP to filter (nginx-json only)
+  -S, --sort-by string   Sort result by (size|requests) (default "size")
   -t, --threshold size   Threshold size for request (only requests at least this large will be counted) (default 10 MB)
   -n, --top int          Number of top items to show (default 10)
   -w, --whole            Analyze whole log file and then tail it

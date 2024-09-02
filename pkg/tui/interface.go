@@ -18,7 +18,8 @@ const (
 
 const helpMsg = `Available shortcuts:
 t/T: print total size aggregated by server
-s/S: get user input for server filtering
+s: set server filtering
+S: change sort by
 ?: help`
 
 type Tui struct {
@@ -27,6 +28,7 @@ type Tui struct {
 	displayRecord map[netip.Prefix]time.Time
 	serverFilter  string
 	mode          ShowMode
+	sortBy        analyze.SortByFlag
 	ticker        *time.Ticker
 	refreshChan   chan struct{}
 	inputChan     chan byte
@@ -38,6 +40,7 @@ func New(analyzer *analyze.Analyzer) *Tui {
 		analyzer:      analyzer,
 		displayRecord: make(map[netip.Prefix]time.Time),
 		mode:          TopValues,
+		sortBy:        analyzer.Config.SortBy,
 		refreshChan:   make(chan struct{}),
 		inputChan:     make(chan byte),
 	}
@@ -54,7 +57,7 @@ func (t *Tui) Run() {
 			t.handleInput(k)
 		case <-t.refreshChan:
 			if t.mode == TopValues {
-				a.PrintTopValues(t.displayRecord, "size", t.serverFilter)
+				a.PrintTopValues(t.displayRecord, t.sortBy, t.serverFilter)
 			} else {
 				a.PrintTotal()
 			}
@@ -65,8 +68,16 @@ func (t *Tui) Run() {
 
 func (t *Tui) handleInput(key byte) {
 	switch key {
-	case 'S', 's':
-		t.handleS()
+	case 's':
+		t.handles()
+	case 'S':
+		if t.sortBy == analyze.SortBySize {
+			t.sortBy = analyze.SortByRequests
+			fmt.Println("Switched to sort by requests")
+		} else {
+			t.sortBy = analyze.SortBySize
+			fmt.Println("Switched to sort by size")
+		}
 	case 'T', 't':
 		if t.mode == TopValues {
 			t.mode = Total
@@ -82,7 +93,7 @@ func (t *Tui) handleInput(key byte) {
 	go t.waitForOneByte()
 }
 
-func (t *Tui) handleS() {
+func (t *Tui) handles() {
 	t.noPrint.Store(true)
 	defer t.noPrint.Store(false)
 

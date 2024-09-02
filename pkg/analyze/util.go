@@ -1,6 +1,7 @@
 package analyze
 
 import (
+	"errors"
 	"net/netip"
 	"strconv"
 
@@ -31,6 +32,33 @@ func (s *SizeFlag) Set(value string) error {
 
 func (s SizeFlag) Type() string {
 	return "size"
+}
+
+type SortByFlag string
+
+const (
+	SortBySize     SortByFlag = "size"
+	SortByRequests SortByFlag = "requests"
+)
+
+func (s SortByFlag) String() string {
+	return string(s)
+}
+
+func (s *SortByFlag) Set(value string) error {
+	switch value {
+	case "size":
+		*s = SortBySize
+	case "requests", "reqs":
+		*s = SortByRequests
+	default:
+		return errors.New(`must be one of "size" or "requests"`)
+	}
+	return nil
+}
+
+func (s SortByFlag) Type() string {
+	return "string"
 }
 
 func IPPrefix(ip netip.Addr) netip.Prefix {

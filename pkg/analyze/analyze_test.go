@@ -34,7 +34,7 @@ func benchmarkAnalyzeLoop(b *testing.B, parserStr string) {
 	}
 
 	a.RunLoop(t)
-	a.PrintTopValues(nil, "size", "")
+	a.PrintTopValues(nil, SortBySize, "")
 }
 
 func BenchmarkAnalyzeLoopNgxJSON(b *testing.B) {
