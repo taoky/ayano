@@ -17,8 +17,9 @@ type scannerIterator struct {
 
 func NewWithScanner(r io.Reader) Iterator {
 	// Prepare a large buffer
+	const bufSz = 1024 * 1024
 	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+	scanner.Buffer(make([]byte, bufSz), bufSz)
 	return &scannerIterator{scanner: scanner}
 }
 
