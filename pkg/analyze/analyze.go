@@ -27,9 +27,11 @@ const (
 )
 
 type IPStats struct {
-	Size      uint64
-	Requests  uint64
-	LastURL   string
+	Size     uint64
+	Requests uint64
+	LastURL  string
+
+	// Used at daemon mode only
 	LastSize  uint64
 	FirstSeen time.Time
 
@@ -38,6 +40,17 @@ type IPStats struct {
 
 	// Record time of last URL access
 	LastURLAccess time.Time
+}
+
+func (i IPStats) UpdateWith(size uint64, url string, logtime time.Time) IPStats {
+	i.Size += size
+	i.Requests += 1
+	if url != i.LastURL {
+		i.LastURL = url
+		i.LastURLUpdate = logtime
+	}
+	i.LastURLAccess = logtime
+	return i
 }
 
 type StatKey struct {
@@ -184,19 +197,22 @@ func (a *Analyzer) handleLine(line []byte) error {
 		a.mu.Lock()
 		defer a.mu.Unlock()
 	}
-	ipStats := a.stats[StatKey{logItem.Server, clientPrefix}]
 
-	ipStats.Size += size
-	ipStats.Requests += 1
-
-	url := logItem.URL
-	if url != ipStats.LastURL {
-		ipStats.LastURL = url
-		ipStats.LastURLUpdate = logItem.Time
+	updateStats := func(key StatKey) {
+		v := a.stats[key]
+		a.stats[key] = v.UpdateWith(size, logItem.URL, logItem.Time)
 	}
-	ipStats.LastURLAccess = logItem.Time
+	updateStats(StatKey{logItem.Server, clientPrefix})
+
+	// Write it twice (to total here) when we have multiple servers
+	if logItem.Server != "" {
+		updateStats(StatKey{"", clientPrefix})
+	}
 
 	if a.Config.Daemon {
+		// If user does not provide a Config.Server, it would be "" -> total
+		// and if user provides one, logItem.Server would just equal to a.Config.Server
+		ipStats := a.stats[StatKey{a.Config.Server, clientPrefix}]
 		delta := ipStats.Size - ipStats.LastSize
 		if ipStats.LastSize == 0 {
 			ipStats.FirstSeen = logItem.Time
@@ -207,11 +223,13 @@ func (a *Analyzer) handleLine(line []byte) error {
 				clientPrefix.String(),
 				humanize.IBytes(ipStats.Size),
 				ipStats.FirstSeen.Format(TimeFormat),
-				url)
+				logItem.URL)
 		}
-		ipStats.LastSize = ipStats.Size
+		ipStats.LastSize += printTimes * oneGB
+		// Just update [StatKey{a.Config.Server, clientPrefix}] here, as the config would not be updated runtime now
+		a.stats[StatKey{a.Config.Server, clientPrefix}] = ipStats
 	}
-	a.stats[StatKey{logItem.Server, clientPrefix}] = ipStats
+
 	return nil
 }
 
@@ -257,7 +275,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 	// sort stats key by value
 	keys := make([]StatKey, 0)
 	for s := range a.stats {
-		if serverFilter != "" && s.Server != serverFilter {
+		if s.Server != serverFilter {
 			continue
 		}
 		keys = append(keys, s)
@@ -333,7 +351,9 @@ func (a *Analyzer) GetCurrentServers() []string {
 	}
 	servers := make(map[string]struct{})
 	for sp := range a.stats {
-		servers[sp.Server] = struct{}{}
+		if sp.Server != "" {
+			servers[sp.Server] = struct{}{}
+		}
 	}
 	keys := make([]string, 0, len(servers))
 	for key := range servers {

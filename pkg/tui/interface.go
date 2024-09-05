@@ -106,6 +106,9 @@ func (t *Tui) handles() {
 		fmt.Printf("Only one server%s is available.\n", serverFmt)
 	} else if len(servers) != 0 {
 		fmt.Println("Please give the server name you want to view. Enter to remove filtering.")
+		if t.serverFilter != "" {
+			fmt.Println("Current:", t.serverFilter)
+		}
 		// Get all servers available
 		fmt.Println("Available servers:")
 		for _, s := range servers {
@@ -117,6 +120,9 @@ func (t *Tui) handles() {
 			if n != 0 {
 				fmt.Println("Failed to get input:", err)
 			} else {
+				if t.serverFilter != "" {
+					fmt.Println("(filter removed)")
+				}
 				t.serverFilter = ""
 			}
 		} else {
