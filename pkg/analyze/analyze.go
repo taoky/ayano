@@ -142,6 +142,23 @@ func (a *Analyzer) RunLoop(iter fileiter.Iterator) error {
 	return nil
 }
 
+func (a *Analyzer) AnalyzeFile(filename string) error {
+	f, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return a.RunLoop(fileiter.NewWithScanner(f))
+}
+
+func (a *Analyzer) TailFile(filename string) error {
+	iter, err := a.OpenTailIterator(filename)
+	if err != nil {
+		return err
+	}
+	return a.RunLoop(iter)
+}
+
 func (a *Analyzer) handleLine(line []byte) error {
 	logItem, err := a.logParser.Parse(line)
 	if err != nil {

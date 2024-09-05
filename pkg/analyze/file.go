@@ -1,7 +1,6 @@
 package analyze
 
 import (
-	"bufio"
 	"io"
 	"os"
 
@@ -55,16 +54,4 @@ func (a *Analyzer) OpenTailIterator(filename string) (fileiter.Iterator, error) 
 		<-t.Lines
 	}
 	return fileiter.NewWithTail(t), nil
-}
-
-func (a *Analyzer) OpenFileIterator(filename string) (fileiter.Iterator, error) {
-	if !a.Config.Analyze {
-		return a.OpenTailIterator(filename)
-	} else {
-		file, err := os.Open(filename)
-		if err != nil {
-			return nil, err
-		}
-		return fileiter.NewWithScanner(bufio.NewScanner(file)), nil
-	}
 }
