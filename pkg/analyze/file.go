@@ -3,12 +3,56 @@ package analyze
 import (
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 
 	"github.com/nxadm/tail"
 	"github.com/taoky/ayano/pkg/fileiter"
 )
 
 const oneMiB = 1024 * 1024
+
+func filterByCommand(r io.Reader, args []string) (io.ReadCloser, error) {
+	cmd := exec.Command(args[0], args[1:]...)
+	cmd.Stdin = r
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	if closer, ok := r.(io.Closer); ok {
+		defer closer.Close()
+	}
+	go cmd.Wait()
+	return stdout, err
+}
+
+type filterFunc func(r io.Reader) (io.Reader, error)
+
+var fileTypes = map[string]filterFunc{
+	".gz": func(r io.Reader) (io.Reader, error) {
+		return filterByCommand(r, []string{"gzip", "-cd"})
+	},
+	".xz": func(r io.Reader) (io.Reader, error) {
+		return filterByCommand(r, []string{"xz", "-cd", "-T", "0"})
+	},
+	".zst": func(r io.Reader) (io.Reader, error) {
+		return filterByCommand(r, []string{"zstd", "-cd", "-T0"})
+	},
+}
+
+func OpenFile(filename string) (io.Reader, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	if filter, ok := fileTypes[filepath.Ext(filename)]; ok {
+		return filter(f)
+	}
+	return f, nil
+}
 
 func (a *Analyzer) OpenTailIterator(filename string) (fileiter.Iterator, error) {
 	var seekInfo *tail.SeekInfo

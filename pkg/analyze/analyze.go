@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/netip"
 	"os"
@@ -143,11 +144,13 @@ func (a *Analyzer) RunLoop(iter fileiter.Iterator) error {
 }
 
 func (a *Analyzer) AnalyzeFile(filename string) error {
-	f, err := os.Open(filename)
+	f, err := OpenFile(filename)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	if closer, ok := f.(io.Closer); ok {
+		defer closer.Close()
+	}
 	return a.RunLoop(fileiter.NewWithScanner(f))
 }
 
