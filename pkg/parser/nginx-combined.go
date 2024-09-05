@@ -8,11 +8,19 @@ import (
 )
 
 func init() {
-	RegisterParser("nginx-combined", func() Parser {
+	newFunc := func() Parser {
 		return NginxCombinedParser{}
+	}
+	RegisterParser(ParserMeta{
+		Name:        "nginx-combined",
+		Description: "For nginx's default `combined` format",
+		F:           newFunc,
 	})
-	RegisterParser("combined", func() Parser {
-		return NginxCombinedParser{}
+	RegisterParser(ParserMeta{
+		Name:        "combined",
+		Description: "An alias for `nginx-combined`",
+		Hidden:      true,
+		F:           newFunc,
 	})
 }
 
