@@ -81,6 +81,7 @@ type AnalyzerConfig struct {
 	SortBy     SortByFlag
 	Threshold  SizeFlag
 	TopN       int
+	Truncate   bool
 	Whole      bool
 
 	Analyze bool
@@ -99,6 +100,7 @@ func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet) {
 	flags.VarP(&c.SortBy, "sort-by", "S", "Sort result by (size|requests)")
 	flags.VarP(&c.Threshold, "threshold", "t", "Threshold size for request (only requests at least this large will be counted)")
 	flags.IntVarP(&c.TopN, "top", "n", c.TopN, "Number of top items to show")
+	flags.BoolVar(&c.Truncate, "truncate", c.Truncate, "Truncate long URLs from output")
 	flags.BoolVarP(&c.Whole, "whole", "w", c.Whole, "Analyze whole log file and then tail it")
 }
 func (c *AnalyzerConfig) UseLock() bool {
@@ -306,6 +308,9 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		total := ipStats.Size
 		reqTotal := ipStats.Requests
 		last := ipStats.LastURL
+		if a.Config.Truncate {
+			last = TruncateURLPath(last)
+		}
 
 		var lastUpdateTime string
 		var lastAccessTime string

@@ -2,8 +2,10 @@ package analyze
 
 import (
 	"errors"
+	"fmt"
 	"net/netip"
 	"strconv"
+	"strings"
 
 	"github.com/dustin/go-humanize"
 )
@@ -69,4 +71,13 @@ func (a *Analyzer) IPPrefix(ip netip.Addr) netip.Prefix {
 		clientPrefix = netip.PrefixFrom(ip, a.Config.PrefixV6)
 	}
 	return clientPrefix.Masked()
+}
+
+func TruncateURLPath(input string) string {
+	count := strings.Count(input, "/")
+	if count <= 2 {
+		return input
+	}
+	parts := strings.Split(input, "/")
+	return fmt.Sprintf("/%s/.../%s", parts[1], parts[count])
 }
