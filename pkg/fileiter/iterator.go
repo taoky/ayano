@@ -2,6 +2,7 @@ package fileiter
 
 import (
 	"bufio"
+	"io"
 
 	"github.com/nxadm/tail"
 )
@@ -14,8 +15,9 @@ type scannerIterator struct {
 	scanner *bufio.Scanner
 }
 
-func NewWithScanner(scanner *bufio.Scanner) Iterator {
+func NewWithScanner(r io.Reader) Iterator {
 	// Prepare a large buffer
+	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 	return &scannerIterator{scanner: scanner}
 }

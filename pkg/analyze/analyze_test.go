@@ -28,12 +28,10 @@ func benchmarkAnalyzeLoop(b *testing.B, parserStr string) {
 		b.Fatal(err)
 	}
 
-	t, err := a.OpenFileIterator(logPath)
+	err = a.AnalyzeFile(logPath)
 	if err != nil {
 		b.Fatal(err)
 	}
-
-	a.RunLoop(t)
 	a.PrintTopValues(nil, SortBySize, "")
 }
 

@@ -49,32 +49,34 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 		}
 	}()
 
-	iterator, err := analyzer.OpenFileIterator(filenames[0])
-	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
+	var errCh chan error
+	if !config.Analyze {
+		go func() {
+			errCh <- analyzer.TailFile(filenames[0])
+		}()
+
+		if !config.Daemon {
+			go tui.New(analyzer).Run()
+		}
+	} else {
+		go func() {
+			errCh <- analyzer.AnalyzeFile(filenames[0])
+		}()
 	}
 
-	if !config.Analyze && !config.Daemon {
-		go tui.New(analyzer).Run()
-	}
 	if config.Daemon {
 		if err := systemd.NotifyReady(); err != nil {
 			return fmt.Errorf("failed to notify systemd: %w", err)
 		}
 	}
 
-	err = analyzer.RunLoop(iterator)
+	err = <-errCh
 
 	for i := 1; i < len(filenames); i++ {
 		if err != nil {
 			break
 		}
-		iterator, err = analyzer.OpenFileIterator(filenames[i])
-		if err != nil {
-			err = fmt.Errorf("failed to open file: %w", err)
-			break
-		}
-		err = analyzer.RunLoop(iterator)
+		err = analyzer.AnalyzeFile(filenames[i])
 	}
 
 	if config.Analyze {
