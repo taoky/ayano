@@ -65,10 +65,10 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 		return err
 	} else {
 		// Tail mode
-		var errCh chan error
-		go func() {
-			errCh <- analyzer.TailFile(filenames[0])
-		}()
+		iter, err := analyzer.OpenTailIterator(filenames[0])
+		if err != nil {
+			return err
+		}
 
 		if config.Daemon {
 			if err := systemd.NotifyReady(); err != nil {
@@ -78,7 +78,7 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 			go tui.New(analyzer).Run()
 		}
 
-		return <-errCh
+		return analyzer.RunLoop(iter)
 	}
 }
 
