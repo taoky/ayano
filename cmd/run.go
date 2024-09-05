@@ -24,9 +24,14 @@ func filenamesFromArgs(args []string) []string {
 }
 
 func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerConfig) error {
+	// Sanily check
+	if config.Analyze && config.Daemon {
+		return errors.New("analyze mode and daemonizing are mutually exclusive")
+	}
+
 	filenames := filenamesFromArgs(args)
-	// Allow multiple files only when ananlyzing and NOT daemonizing
-	if !(config.Analyze && !config.Daemon) && len(filenames) != 1 {
+	// Allow multiple files only in analyze mode
+	if !config.Analyze && len(filenames) != 1 {
 		return errors.New("only one log file can be specified when following or daemonizing")
 	}
 	fmt.Fprintln(cmd.ErrOrStderr(), "Using log files:", filenames)
@@ -50,23 +55,22 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 	}()
 
 	var errCh chan error
-	if !config.Analyze {
+	if config.Analyze {
+		go func() {
+			errCh <- analyzer.AnalyzeFile(filenames[0])
+		}()
+	} else {
+		// Tail mode
 		go func() {
 			errCh <- analyzer.TailFile(filenames[0])
 		}()
 
-		if !config.Daemon {
+		if config.Daemon {
+			if err := systemd.NotifyReady(); err != nil {
+				return fmt.Errorf("failed to notify systemd: %w", err)
+			}
+		} else {
 			go tui.New(analyzer).Run()
-		}
-	} else {
-		go func() {
-			errCh <- analyzer.AnalyzeFile(filenames[0])
-		}()
-	}
-
-	if config.Daemon {
-		if err := systemd.NotifyReady(); err != nil {
-			return fmt.Errorf("failed to notify systemd: %w", err)
 		}
 	}
 
