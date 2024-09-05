@@ -22,10 +22,12 @@ func filterByCommand(r io.Reader, args []string) (io.ReadCloser, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
-	if closer, ok := r.(io.Closer); ok {
-		defer closer.Close()
-	}
-	go cmd.Wait()
+	go func() {
+		cmd.Wait()
+		if closer, ok := r.(io.Closer); ok {
+			closer.Close()
+		}
+	}()
 	return stdout, err
 }
 
