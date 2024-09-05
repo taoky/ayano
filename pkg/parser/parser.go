@@ -21,21 +21,36 @@ type Parser interface {
 
 type NewFunc func() Parser
 
+type ParserMeta struct {
+	Name        string
+	Description string
+	Hidden      bool
+	F           NewFunc
+}
+
 var (
 	json                  = jsoniter.ConfigCompatibleWithStandardLibrary
 	ErrExpectedIgnoredLog = errors.New("ignored")
 
-	registry = make(map[string]NewFunc)
+	registry = make(map[string]ParserMeta)
 )
 
-func RegisterParser(name string, newFunc NewFunc) {
-	registry[name] = newFunc
+func RegisterParser(m ParserMeta) {
+	registry[m.Name] = m
 }
 
 func GetParser(name string) (Parser, error) {
-	newFunc, ok := registry[name]
+	m, ok := registry[name]
 	if !ok {
 		return nil, errors.New(name)
 	}
-	return newFunc(), nil
+	return m.F(), nil
+}
+
+func All() []ParserMeta {
+	result := make([]ParserMeta, 0, len(registry))
+	for _, m := range registry {
+		result = append(result, m)
+	}
+	return result
 }

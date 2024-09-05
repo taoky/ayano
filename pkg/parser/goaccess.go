@@ -8,12 +8,16 @@ import (
 )
 
 func init() {
-	RegisterParser("goaccess", func() Parser {
-		parser, err := GoAccessFormatParser{}.new()
-		if err != nil {
-			log.Fatalln("goaccess init failed (You might need to set GOACCESS_CONFIG env)\n", err)
-		}
-		return parser
+	RegisterParser(ParserMeta{
+		Name:        "goaccess",
+		Description: "GoAccess output format",
+		F: func() Parser {
+			parser, err := GoAccessFormatParser{}.new()
+			if err != nil {
+				log.Fatalln("goaccess init failed (You might need to set GOACCESS_CONFIG env)\n", err)
+			}
+			return parser
+		},
 	})
 }
 

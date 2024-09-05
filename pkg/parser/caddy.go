@@ -6,11 +6,20 @@ import (
 )
 
 func init() {
-	RegisterParser("caddy-json", func() Parser {
+	newFunc := func() Parser {
 		return CaddyJSONParser{}
+	}
+
+	RegisterParser(ParserMeta{
+		Name:        "caddy-json",
+		Description: "Caddy's default JSON format",
+		F:           newFunc,
 	})
-	RegisterParser("caddy", func() Parser {
-		return CaddyJSONParser{}
+	RegisterParser(ParserMeta{
+		Name:        "caddy",
+		Description: "An alias for `caddy-json`",
+		Hidden:      true,
+		F:           newFunc,
 	})
 }
 

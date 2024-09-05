@@ -75,7 +75,7 @@ func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet) {
 	flags.BoolVarP(&c.Absolute, "absolute", "a", c.Absolute, "Show absolute time for each item")
 	flags.StringVarP(&c.LogOutput, "outlog", "o", c.LogOutput, "Change log output file")
 	flags.BoolVarP(&c.NoNetstat, "no-netstat", "", c.NoNetstat, "Do not detect active connections")
-	flags.StringVarP(&c.Parser, "parser", "p", c.Parser, "Log parser (nginx-combined|nginx-json|caddy-json|goaccess)")
+	flags.StringVarP(&c.Parser, "parser", "p", c.Parser, "Log parser (see `ayano list parsers`)")
 	flags.IntVarP(&c.RefreshSec, "refresh", "r", c.RefreshSec, "Refresh interval in seconds")
 	flags.StringVarP(&c.Server, "server", "s", c.Server, "Server IP to filter (nginx-json only)")
 	flags.VarP(&c.SortBy, "sort-by", "S", "Sort result by (size|requests)")

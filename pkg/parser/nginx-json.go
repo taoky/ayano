@@ -6,11 +6,19 @@ import (
 )
 
 func init() {
-	RegisterParser("nginx-json", func() Parser {
+	newFunc := func() Parser {
 		return NginxJSONParser{}
+	}
+	RegisterParser(ParserMeta{
+		Name:        "nginx-json",
+		Description: "`nginx-json` format, see README.md for details",
+		F:           newFunc,
 	})
-	RegisterParser("ngx_json", func() Parser {
-		return NginxJSONParser{}
+	RegisterParser(ParserMeta{
+		Name:        "ngx_json",
+		Description: "An alias for `nginx-json`",
+		Hidden:      true,
+		F:           newFunc,
 	})
 }
 
