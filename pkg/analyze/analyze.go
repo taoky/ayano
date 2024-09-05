@@ -91,7 +91,7 @@ func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet) {
 	flags.BoolVarP(&c.Absolute, "absolute", "a", c.Absolute, "Show absolute time for each item")
 	flags.StringVarP(&c.LogOutput, "outlog", "o", c.LogOutput, "Change log output file")
 	flags.BoolVarP(&c.NoNetstat, "no-netstat", "", c.NoNetstat, "Do not detect active connections")
-	flags.StringVarP(&c.Parser, "parser", "p", c.Parser, "Log parser (see `ayano list parsers`)")
+	flags.StringVarP(&c.Parser, "parser", "p", c.Parser, "Log parser (see \"ayano list parsers\")")
 	flags.IntVar(&c.PrefixV4, "prefixv4", c.PrefixV4, "Group IPv4 by prefix")
 	flags.IntVar(&c.PrefixV6, "prefixv6", c.PrefixV6, "Group IPv6 by prefix")
 	flags.IntVarP(&c.RefreshSec, "refresh", "r", c.RefreshSec, "Refresh interval in seconds")
