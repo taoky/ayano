@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -15,16 +16,21 @@ import (
 
 const defaultFilename = "/var/log/nginx/mirrors/access_json.log"
 
-func filenameFromArgs(args []string) string {
+func filenamesFromArgs(args []string) []string {
 	if len(args) == 0 {
-		return defaultFilename
+		return []string{defaultFilename}
 	}
-	return args[0]
+	return args
 }
 
 func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerConfig) error {
-	filename := filenameFromArgs(args)
-	fmt.Fprintln(cmd.ErrOrStderr(), "Using log file:", filename)
+	filenames := filenamesFromArgs(args)
+	// Allow multiple files only when ananlyzing and NOT daemonizing
+	if !(config.Analyze && !config.Daemon) && len(filenames) != 1 {
+		return errors.New("only one log file can be specified when following or daemonizing")
+	}
+	fmt.Fprintln(cmd.ErrOrStderr(), "Using log files:", filenames)
+
 	analyzer, err := analyze.NewAnalyzer(config)
 	if err != nil {
 		return fmt.Errorf("failed to create analyzer: %w", err)
@@ -43,7 +49,7 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 		}
 	}()
 
-	iterator, err := analyzer.OpenFileIterator(filename)
+	iterator, err := analyzer.OpenFileIterator(filenames[0])
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
 	}
@@ -57,12 +63,24 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 		}
 	}
 
-	analyzer.RunLoop(iterator)
+	err = analyzer.RunLoop(iterator)
+
+	for i := 1; i < len(filenames); i++ {
+		if err != nil {
+			break
+		}
+		iterator, err = analyzer.OpenFileIterator(filenames[i])
+		if err != nil {
+			err = fmt.Errorf("failed to open file: %w", err)
+			break
+		}
+		err = analyzer.RunLoop(iterator)
+	}
 
 	if config.Analyze {
 		analyzer.PrintTopValues(nil, config.SortBy, "")
 	}
-	return nil
+	return err
 }
 
 func runCmd() *cobra.Command {
@@ -81,10 +99,9 @@ func runCmd() *cobra.Command {
 
 func analyzeCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "analyze [filename]",
+		Use:     "analyze [filename...]",
 		Aliases: []string{"analyse"},
 		Short:   "Log analyse mode (no tail following, only show top N at the end, and implies --whole)",
-		Args:    cobra.MaximumNArgs(1),
 	}
 	config := analyze.DefaultConfig()
 	config.InstallFlags(cmd.Flags())
