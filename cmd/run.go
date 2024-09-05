@@ -54,13 +54,18 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 		}
 	}()
 
-	var errCh chan error
 	if config.Analyze {
-		go func() {
-			errCh <- analyzer.AnalyzeFile(filenames[0])
-		}()
+		for _, filename := range filenames {
+			err = analyzer.AnalyzeFile(filename)
+			if err != nil {
+				break
+			}
+		}
+		analyzer.PrintTopValues(nil, config.SortBy, "")
+		return err
 	} else {
 		// Tail mode
+		var errCh chan error
 		go func() {
 			errCh <- analyzer.TailFile(filenames[0])
 		}()
@@ -72,21 +77,9 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 		} else {
 			go tui.New(analyzer).Run()
 		}
-	}
 
-	err = <-errCh
-
-	for i := 1; i < len(filenames); i++ {
-		if err != nil {
-			break
-		}
-		err = analyzer.AnalyzeFile(filenames[i])
+		return <-errCh
 	}
-
-	if config.Analyze {
-		analyzer.PrintTopValues(nil, config.SortBy, "")
-	}
-	return err
 }
 
 func runCmd() *cobra.Command {
