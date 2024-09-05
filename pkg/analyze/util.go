@@ -61,12 +61,12 @@ func (s SortByFlag) Type() string {
 	return "string"
 }
 
-func IPPrefix(ip netip.Addr) netip.Prefix {
+func (a *Analyzer) IPPrefix(ip netip.Addr) netip.Prefix {
 	var clientPrefix netip.Prefix
 	if ip.Is4() {
-		clientPrefix = netip.PrefixFrom(ip, 24)
+		clientPrefix = netip.PrefixFrom(ip, a.Config.PrefixV4)
 	} else {
-		clientPrefix = netip.PrefixFrom(ip, 48)
+		clientPrefix = netip.PrefixFrom(ip, a.Config.PrefixV6)
 	}
 	return clientPrefix.Masked()
 }

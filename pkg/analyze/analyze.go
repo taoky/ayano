@@ -74,6 +74,8 @@ type AnalyzerConfig struct {
 	LogOutput  string
 	NoNetstat  bool
 	Parser     string
+	PrefixV4   int
+	PrefixV6   int
 	RefreshSec int
 	Server     string
 	SortBy     SortByFlag
@@ -90,6 +92,8 @@ func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet) {
 	flags.StringVarP(&c.LogOutput, "outlog", "o", c.LogOutput, "Change log output file")
 	flags.BoolVarP(&c.NoNetstat, "no-netstat", "", c.NoNetstat, "Do not detect active connections")
 	flags.StringVarP(&c.Parser, "parser", "p", c.Parser, "Log parser (see `ayano list parsers`)")
+	flags.IntVar(&c.PrefixV4, "prefixv4", c.PrefixV4, "Group IPv4 by prefix")
+	flags.IntVar(&c.PrefixV6, "prefixv6", c.PrefixV6, "Group IPv6 by prefix")
 	flags.IntVarP(&c.RefreshSec, "refresh", "r", c.RefreshSec, "Refresh interval in seconds")
 	flags.StringVarP(&c.Server, "server", "s", c.Server, "Server IP to filter (nginx-json only)")
 	flags.VarP(&c.SortBy, "sort-by", "S", "Sort result by (size|requests)")
@@ -104,6 +108,8 @@ func (c *AnalyzerConfig) UseLock() bool {
 func DefaultConfig() AnalyzerConfig {
 	return AnalyzerConfig{
 		Parser:     "nginx-json",
+		PrefixV4:   24,
+		PrefixV6:   48,
 		RefreshSec: 5,
 		SortBy:     SortBySize,
 		Threshold:  SizeFlag(10e6),
@@ -191,7 +197,7 @@ func (a *Analyzer) handleLine(line []byte) error {
 	if err != nil {
 		return fmt.Errorf("parse ip error: %w", err)
 	}
-	clientPrefix := IPPrefix(clientip)
+	clientPrefix := a.IPPrefix(clientip)
 
 	if a.Config.UseLock() {
 		a.mu.Lock()
@@ -248,7 +254,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 				if !ok {
 					continue
 				}
-				activeConn[IPPrefix(ip)] += 1
+				activeConn[a.IPPrefix(ip)] += 1
 			}
 		}
 		tabs, err = netstat.TCP6Socks(func(s *netstat.SockTabEntry) bool {
@@ -262,7 +268,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 				if !ok {
 					continue
 				}
-				activeConn[IPPrefix(ip)] += 1
+				activeConn[a.IPPrefix(ip)] += 1
 			}
 		}
 	}
