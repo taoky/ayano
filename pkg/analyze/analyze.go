@@ -240,38 +240,42 @@ func (a *Analyzer) handleLine(line []byte) error {
 	return nil
 }
 
+func (a *Analyzer) GetActiveConns(activeConn map[netip.Prefix]int) {
+	// Get active connections
+	tabs, err := netstat.TCPSocks(func(s *netstat.SockTabEntry) bool {
+		return s.State == netstat.Established
+	})
+	if err != nil {
+		a.logger.Printf("netstat error: %v", err)
+	} else {
+		for _, tab := range tabs {
+			ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
+			if !ok {
+				continue
+			}
+			activeConn[a.IPPrefix(ip)] += 1
+		}
+	}
+	tabs, err = netstat.TCP6Socks(func(s *netstat.SockTabEntry) bool {
+		return s.State == netstat.Established
+	})
+	if err != nil {
+		a.logger.Printf("netstat error: %v", err)
+	} else {
+		for _, tab := range tabs {
+			ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
+			if !ok {
+				continue
+			}
+			activeConn[a.IPPrefix(ip)] += 1
+		}
+	}
+}
+
 func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag, serverFilter string) {
 	activeConn := make(map[netip.Prefix]int)
 	if !a.Config.NoNetstat {
-		// Get active connections
-		tabs, err := netstat.TCPSocks(func(s *netstat.SockTabEntry) bool {
-			return s.State == netstat.Established
-		})
-		if err != nil {
-			a.logger.Printf("netstat error: %v", err)
-		} else {
-			for _, tab := range tabs {
-				ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
-				if !ok {
-					continue
-				}
-				activeConn[a.IPPrefix(ip)] += 1
-			}
-		}
-		tabs, err = netstat.TCP6Socks(func(s *netstat.SockTabEntry) bool {
-			return s.State == netstat.Established
-		})
-		if err != nil {
-			a.logger.Printf("netstat error: %v", err)
-		} else {
-			for _, tab := range tabs {
-				ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
-				if !ok {
-					continue
-				}
-				activeConn[a.IPPrefix(ip)] += 1
-			}
-		}
+		a.GetActiveConns(activeConn)
 	}
 
 	if a.Config.UseLock() {
