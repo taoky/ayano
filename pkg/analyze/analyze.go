@@ -42,14 +42,14 @@ type IPStats struct {
 	LastURLAccess time.Time
 }
 
-func (i IPStats) UpdateWith(size uint64, url string, logtime time.Time) IPStats {
-	i.Size += size
+func (i IPStats) UpdateWith(item parser.LogItem) IPStats {
+	i.Size += item.Size
 	i.Requests += 1
-	if url != i.LastURL {
-		i.LastURL = url
-		i.LastURLUpdate = logtime
+	if item.URL != i.LastURL {
+		i.LastURL = item.URL
+		i.LastURLUpdate = item.Time
 	}
-	i.LastURLAccess = logtime
+	i.LastURLAccess = item.Time
 	return i
 }
 
@@ -207,8 +207,7 @@ func (a *Analyzer) handleLine(line []byte) error {
 	}
 
 	updateStats := func(key StatKey) {
-		v := a.stats[key]
-		a.stats[key] = v.UpdateWith(size, logItem.URL, logItem.Time)
+		a.stats[key] = a.stats[key].UpdateWith(logItem)
 	}
 	updateStats(StatKey{logItem.Server, clientPrefix})
 
