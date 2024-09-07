@@ -49,6 +49,7 @@ func (i IPStats) UpdateWith(item parser.LogItem) IPStats {
 		if i.LastURLUpdate.Before(item.Time) {
 			i.LastURL = item.URL
 			i.LastURLUpdate = item.Time
+			i.LastURLAccess = item.Time
 		}
 	} else {
 		if i.LastURLAccess.Before(item.Time) {
