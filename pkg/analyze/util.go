@@ -79,5 +79,9 @@ func TruncateURLPath(input string) string {
 		return input
 	}
 	parts := strings.Split(input, "/")
+	if parts[len(parts)-1] == "" {
+		count--
+		parts[count] += "/"
+	}
 	return fmt.Sprintf("/%s/.../%s", parts[1], parts[count])
 }
