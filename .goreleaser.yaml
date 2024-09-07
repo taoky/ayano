@@ -1,0 +1,43 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: ayano
+    binary: "{{ .ProjectName }}-{{ .Os  }}-{{ .Arch }}{{ if .Amd64 }}-{{ .Amd64 }}{{ end }}"
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    goarm:
+      - 7
+    goamd64:
+      - v2
+      - v3
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/taoky/ayano/pkg/info.Version={{.Version}} -X github.com/taoky/ayano/pkg/info.BuildDate={{.Date}} -X github.com/taoky/ayano/pkg/info.GitCommit={{.Commit}}
+    no_unique_dist_dir: true
+
+archives:
+  - format: binary
+    name_template: "{{ .Binary }}"
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  use: github-native
+
+# modelines, feel free to remove those if you don't want/use them:
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj

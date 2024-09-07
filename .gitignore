@@ -3,3 +3,4 @@ ayano-*
 ayano.test
 cpu.pprof
 __debug_bin*
+/dist/

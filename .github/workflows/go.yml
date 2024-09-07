@@ -15,7 +15,8 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v5
       with:
-        go-version: ^1.22
+        go-version: stable
+        check-latest: true
       id: go
 
     - name: Get dependencies
@@ -29,21 +30,14 @@ jobs:
       run: |
         go test -race ./... && go vet ./...
 
-    - name: Build
-      run: |
-        GOARCH=amd64 CGO_ENABLED=0 go build -o ayano-amd64 -v .
-        GOARCH=arm64 CGO_ENABLED=0 go build -o ayano-arm64 -v .
+    - uses: goreleaser/goreleaser-action@v6
+      with:
+        args: build
 
-    - name: Deploy - Create Release
-      if: startsWith(github.ref, 'refs/tags/')
-      id: create_release
-      uses: softprops/action-gh-release@v2
+    - uses: goreleaser/goreleaser-action@v6
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      with:
+        version: latest
+        args: release --clean
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref_name }}
-        draft: false
-        files: |
-          ayano-amd64
-          ayano-arm64
-        prerelease: false
