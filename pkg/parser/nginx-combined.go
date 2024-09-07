@@ -3,14 +3,14 @@ package parser
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"regexp"
 	"strconv"
 	"time"
 )
 
 func init() {
-	newFunc := func() Parser {
-		return ParserFunc(ParseNginxCombined)
-	}
+	newFunc := func() Parser { return ParserFunc(ParseNginxCombined) }
 	RegisterParser(ParserMeta{
 		Name:        "nginx-combined",
 		Description: "For nginx's default `combined` format",
@@ -22,12 +22,29 @@ func init() {
 		Hidden:      true,
 		F:           newFunc,
 	})
+
+	newFuncRegex := func() Parser { return ParserFunc(ParseNginxCombinedRegex) }
+	RegisterParser(ParserMeta{
+		Name:        "nginx-combined-regex",
+		Description: "For nginx's default `combined` format, using regular expressions",
+		F:           newFuncRegex,
+	})
+	RegisterParser(ParserMeta{
+		Name:        "combined-regex",
+		Description: "An alias for `nginx-combined-regex`",
+		Hidden:      true,
+		F:           newFuncRegex,
+	})
 }
 
 const CommonLogFormat = "02/Jan/2006:15:04:05 -0700"
 
 func clfDateParse(s []byte) time.Time {
-	t, _ := time.Parse(CommonLogFormat, string(s))
+	return clfDateParseString(string(s))
+}
+
+func clfDateParseString(s string) time.Time {
+	t, _ := time.Parse(CommonLogFormat, s)
 	return t
 }
 
@@ -108,5 +125,25 @@ func ParseNginxCombined(line []byte) (LogItem, error) {
 		Client: string(clientIP),
 		Time:   localTime,
 		URL:    string(url),
+	}, nil
+}
+
+// 1       2         3          4      5    6                7     8      9         10
+var nginxCombinedRe = regexp.MustCompile(`^(\S+) - ([^[]+) \[([^]]+)\] "([^ ]+ )?([^ ]+)( HTTP/[\d.]+)?" (\d+) (\d+) "([^"]*)" "([^"]*)"\s*$`)
+
+func ParseNginxCombinedRegex(line []byte) (LogItem, error) {
+	m := nginxCombinedRe.FindStringSubmatch(string(line))
+	if m == nil {
+		return LogItem{}, errors.New("unexpected format")
+	}
+	size, err := strconv.ParseUint(m[8], 10, 64)
+	if err != nil {
+		return LogItem{}, fmt.Errorf("invalid size %s: %w", m[8], err)
+	}
+	return LogItem{
+		Client: m[1],
+		Time:   clfDateParseString(m[3]),
+		URL:    m[5],
+		Size:   size,
 	}, nil
 }
