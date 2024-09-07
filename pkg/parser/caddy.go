@@ -7,7 +7,7 @@ import (
 
 func init() {
 	newFunc := func() Parser {
-		return CaddyJSONParser{}
+		return ParserFunc(ParseCaddyJSON)
 	}
 
 	RegisterParser(ParserMeta{
@@ -23,8 +23,6 @@ func init() {
 	})
 }
 
-type CaddyJSONParser struct{}
-
 type CaddyJsonLogRequest struct {
 	RemoteIP string `json:"remote_ip"`
 	ClientIP string `json:"client_ip"`
@@ -38,7 +36,7 @@ type CaddyJsonLog struct {
 	Size      uint64              `json:"size"`
 }
 
-func (p CaddyJSONParser) Parse(line []byte) (LogItem, error) {
+func ParseCaddyJSON(line []byte) (LogItem, error) {
 	var logItem CaddyJsonLog
 	err := json.Unmarshal(line, &logItem)
 	if err != nil {

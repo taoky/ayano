@@ -7,7 +7,7 @@ import (
 
 func init() {
 	newFunc := func() Parser {
-		return NginxJSONParser{}
+		return ParserFunc(ParseNginxJSON)
 	}
 	RegisterParser(ParserMeta{
 		Name:        "nginx-json",
@@ -22,8 +22,6 @@ func init() {
 	})
 }
 
-type NginxJSONParser struct{}
-
 type NginxJSONLog struct {
 	Size      uint64  `json:"size"`
 	Client    string  `json:"clientip"`
@@ -32,7 +30,7 @@ type NginxJSONLog struct {
 	ServerIP  string  `json:"serverip"`
 }
 
-func (p NginxJSONParser) Parse(line []byte) (LogItem, error) {
+func ParseNginxJSON(line []byte) (LogItem, error) {
 	var logItem NginxJSONLog
 	err := json.Unmarshal(line, &logItem)
 	if err != nil {

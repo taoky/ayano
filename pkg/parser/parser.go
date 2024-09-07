@@ -19,6 +19,12 @@ type Parser interface {
 	Parse(line []byte) (LogItem, error)
 }
 
+type ParserFunc func(line []byte) (LogItem, error)
+
+func (p ParserFunc) Parse(line []byte) (LogItem, error) {
+	return p(line)
+}
+
 type NewFunc func() Parser
 
 type ParserMeta struct {

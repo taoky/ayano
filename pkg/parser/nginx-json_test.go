@@ -6,7 +6,7 @@ import (
 )
 
 func TestNginxJsonParser(t *testing.T) {
-	p := NginxJSONParser{}
+	p := ParserFunc(ParseNginxJSON)
 	line := `{"timestamp":1678551332.293,"clientip":"123.45.67.8","serverip":"87.65.4.32","method":"GET","url":"/path/to/a/file","status":200,"size":3009,"resp_time":0.000,"http_host":"example.com","referer":"","user_agent":""}`
 	log, err := p.Parse([]byte(line))
 	if err != nil {

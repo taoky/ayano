@@ -9,7 +9,7 @@ import (
 
 func init() {
 	newFunc := func() Parser {
-		return NginxCombinedParser{}
+		return ParserFunc(ParseNginxCombined)
 	}
 	RegisterParser(ParserMeta{
 		Name:        "nginx-combined",
@@ -31,9 +31,7 @@ func clfDateParse(s []byte) time.Time {
 	return t
 }
 
-type NginxCombinedParser struct{}
-
-func (p NginxCombinedParser) Parse(line []byte) (LogItem, error) {
+func ParseNginxCombined(line []byte) (LogItem, error) {
 	baseIdx := 0
 	// get the first -
 	delimIndex := bytes.IndexByte(line, '-')

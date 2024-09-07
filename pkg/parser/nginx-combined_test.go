@@ -6,7 +6,7 @@ import (
 )
 
 func TestNginxCombinedParser(t *testing.T) {
-	p := NginxCombinedParser{}
+	p := ParserFunc(ParseNginxCombined)
 	line := `123.45.67.8 - - [12/Mar/2023:00:15:32 +0800] "GET /path/to/a/file HTTP/1.1" 200 3009 "-" ""`
 	log, err := p.Parse([]byte(line))
 	if err != nil {
@@ -28,7 +28,7 @@ func TestNginxCombinedParser(t *testing.T) {
 }
 
 func TestNginxCombinedParserWithUnusualInputs(t *testing.T) {
-	p := NginxCombinedParser{}
+	p := ParserFunc(ParseNginxCombined)
 	line := `114.5.1.4 - - [04/Apr/2024:08:01:12 +0800] "\x16\x03\x01\x00\xCA\x01\x00\x00\xC6\x03\x03\x94b\x22\x06u\xBEi\xF6\xC5cA\x97eq\xF0\xD5\xD3\xE6\x08I" 400 163 "-" "-"`
 	log, err := p.Parse([]byte(line))
 	if err != nil {
