@@ -46,10 +46,15 @@ func (i IPStats) UpdateWith(item parser.LogItem) IPStats {
 	i.Size += item.Size
 	i.Requests += 1
 	if item.URL != i.LastURL {
-		i.LastURL = item.URL
-		i.LastURLUpdate = item.Time
+		if i.LastURLUpdate.Before(item.Time) {
+			i.LastURL = item.URL
+			i.LastURLUpdate = item.Time
+		}
+	} else {
+		if i.LastURLAccess.Before(item.Time) {
+			i.LastURLAccess = item.Time
+		}
 	}
-	i.LastURLAccess = item.Time
 	return i
 }
 
@@ -186,15 +191,20 @@ func (a *Analyzer) TailFile(filename string) error {
 func (a *Analyzer) handleLine(line []byte) error {
 	logItem, err := a.logParser.Parse(line)
 	if err != nil {
-		return fmt.Errorf("parse error: %w\ngot line: %s", err, line)
+		return fmt.Errorf("parse error: %w\ngot line: %q", err, line)
 	}
+
+	// Filter by server
 	if a.Config.Server != "" && logItem.Server != a.Config.Server {
 		return nil
 	}
+
+	// Filter by sent size
 	size := logItem.Size
 	if size < uint64(a.Config.Threshold) {
 		return nil
 	}
+
 	clientip, err := netip.ParseAddr(logItem.Client)
 	if err != nil {
 		return fmt.Errorf("parse ip error: %w", err)
