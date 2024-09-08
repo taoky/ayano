@@ -55,3 +55,18 @@ func TestNginxCombinedParserWithUnusualInputs(t *testing.T) {
 	testNginxCombinedParserWithUnusualInputs(t, ParserFunc(ParseNginxCombined))
 	testNginxCombinedParserWithUnusualInputs(t, ParserFunc(ParseNginxCombinedRegex))
 }
+
+func testNginxNotProperlyEscaped(t *testing.T, p Parser) {
+	line := `114.5.1.4 - - [01/May/2024:01:02:03 +0800] "GET /echo%20ebisyz$()\%20ziyihu\nz^xyu||a%20%23'%20&echo%20ebisyz$()\%20ziyihu\nz^xyu||a%20%23|"%20&echo%20ebisyz$()\%20ziyihu\nz^xyu||a%20%23/fonts/ HTTP/1.1" 404 178 "" "Example UA"`
+	log, err := p.Parse([]byte(line))
+	if err != nil {
+		t.Error(err)
+	}
+	if log.URL != `/echo%20ebisyz$()\%20ziyihu\nz^xyu||a%20%23'%20&echo%20ebisyz$()\%20ziyihu\nz^xyu||a%20%23|"%20&echo%20ebisyz$()\%20ziyihu\nz^xyu||a%20%23/fonts/` {
+		t.Errorf("expected url does not match, got %q", log.URL)
+	}
+}
+
+func TestNginxNotProperlyEscaped(t *testing.T) {
+	testNginxNotProperlyEscaped(t, ParserFunc(ParseNginxCombinedRegex))
+}
