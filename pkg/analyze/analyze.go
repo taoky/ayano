@@ -194,7 +194,10 @@ func (a *Analyzer) handleLine(line []byte) error {
 	if err != nil {
 		return fmt.Errorf("parse error: %w\ngot line: %q", err, line)
 	}
+	return a.handleLogItem(logItem)
+}
 
+func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
 	// Filter by server
 	if a.Config.Server != "" && logItem.Server != a.Config.Server {
 		return nil
