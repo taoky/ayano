@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/pprof"
 	"syscall"
 
 	"github.com/spf13/cobra"
@@ -104,8 +105,22 @@ func analyzeCmd() *cobra.Command {
 	}
 	config := analyze.DefaultConfig()
 	config.InstallFlags(cmd.Flags())
+
+	var pprofFile string
+	cmd.Flags().StringVar(&pprofFile, "pprof", "", "write pprof data to file")
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		config.Analyze = true
+		if pprofFile != "" {
+			f, err := os.Create(pprofFile)
+			if err != nil {
+				return fmt.Errorf("failed to create pprof file: %w", err)
+			}
+			defer f.Close()
+			if err := pprof.StartCPUProfile(f); err != nil {
+				return fmt.Errorf("failed to start pprof: %w", err)
+			}
+			defer pprof.StopCPUProfile()
+		}
 		return runWithConfig(cmd, args, config)
 	}
 	return cmd
