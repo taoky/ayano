@@ -48,6 +48,24 @@ func clfDateParseString(s string) time.Time {
 	return t
 }
 
+// Nginx escapes `"`, `\` to `\xXX`
+// Apache esacpes `"`, `\` to `\"` `\\`
+func findEndingDoubleQuote(data []byte) int {
+	inEscape := false
+	for i := 1; i < len(data); i++ {
+		if inEscape {
+			inEscape = false
+		} else {
+			if data[i] == '\\' {
+				inEscape = true
+			} else if data[i] == '"' {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
 func ParseNginxCombined(line []byte) (LogItem, error) {
 	baseIdx := 0
 	// get the first -
@@ -81,7 +99,7 @@ func ParseNginxCombined(line []byte) (LogItem, error) {
 	if leftQuoteIndex == -1 {
 		return LogItem{}, errors.New("unexpected format: no \"")
 	}
-	rightQuoteIndex := bytes.IndexByte(line[baseIdx+leftQuoteIndex+1:], '"')
+	rightQuoteIndex := findEndingDoubleQuote(line[baseIdx+leftQuoteIndex+1:])
 	if rightQuoteIndex == -1 {
 		return LogItem{}, errors.New("unexpected format: no \" after first \"")
 	}
@@ -128,8 +146,8 @@ func ParseNginxCombined(line []byte) (LogItem, error) {
 	}, nil
 }
 
-// 1       2         3          4      5    6                7     8      9         10
-var nginxCombinedRe = regexp.MustCompile(`^(\S+) - ([^[]+) \[([^]]+)\] "([^ ]+ )?([^ ]+)( HTTP/[\d.]+)?" (\d+) (\d+) "([^"]*)" "([^"]*)"\s*$`)
+// 1       2         3          4      5    6                7     8
+var nginxCombinedRe = regexp.MustCompile(`^(\S+) - ([^[]+) \[([^]]+)\] "([^ ]+ )?([^ ]+)( HTTP/[\d.]+)?" (\d+) (\d+)`)
 
 func ParseNginxCombinedRegex(line []byte) (LogItem, error) {
 	m := nginxCombinedRe.FindStringSubmatch(string(line))

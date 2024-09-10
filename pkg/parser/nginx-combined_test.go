@@ -49,6 +49,12 @@ func testNginxCombinedParserWithUnusualInputs(t *testing.T, p Parser) {
 	if log.URL != `~W\xB9\x94Qs\x01\x02\xE3c'\xA8pB\xC5\xCC\x10c\xC9\xF4\x99{\x0E1\x90\x81\xBD4J\x10y\x17\x00&\xC0+\xC0/\xC0,\xC00\xCC\xA9\xCC\xA8\xC0\x09\xC0\x13\xC0` {
 		t.Errorf("expected url does not match, got %q", log.URL)
 	}
+	// In nginx double quote is escaped as \x22, but in apache2 it's escaped as \"
+	line = `172.17.0.1 - - [10/Sep/2024:21:18:44 +0000] "GET /aaaaa\"\"\" HTTP/1.1" 404 196 "http://referer.example.com/\"example/" "Useragent\"\"test"`
+	log, err = p.Parse([]byte(line))
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 func TestNginxCombinedParserWithUnusualInputs(t *testing.T) {
@@ -68,5 +74,6 @@ func testNginxNotProperlyEscaped(t *testing.T, p Parser) {
 }
 
 func TestNginxNotProperlyEscaped(t *testing.T) {
+	// Cases `"` is not escaped at all. This case would NOT be supported by ParseNginxCombined.
 	testNginxNotProperlyEscaped(t, ParserFunc(ParseNginxCombinedRegex))
 }
