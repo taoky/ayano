@@ -73,6 +73,23 @@ func (a *Analyzer) IPPrefix(ip netip.Addr) netip.Prefix {
 	return clientPrefix.Masked()
 }
 
+func AdjacentPrefix(p netip.Prefix) netip.Prefix {
+	bits := p.Bits()
+	if bits == 0 {
+		return p
+	}
+	a := p.Addr()
+	if a.Is4() {
+		addr := a.As4()
+		addr[(bits-1)/8] ^= uint8(1 << (7 - (bits-1)%8))
+		return netip.PrefixFrom(netip.AddrFrom4(addr), bits)
+	} else {
+		addr := a.As16()
+		addr[(bits-1)/8] ^= uint8(1 << (7 - (bits-1)%8))
+		return netip.PrefixFrom(netip.AddrFrom16(addr), bits)
+	}
+}
+
 func TruncateURLPath(input string) string {
 	count := strings.Count(input, "/")
 	if count <= 2 {
