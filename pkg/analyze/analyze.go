@@ -31,7 +31,7 @@ type IPStats struct {
 	Requests uint64
 	LastURL  string
 
-	// Used at daemon mode only
+	// Used with daemon mode only
 	LastSize  uint64
 	FirstSeen time.Time
 
@@ -59,6 +59,24 @@ func (i IPStats) UpdateWith(item parser.LogItem) IPStats {
 	return i
 }
 
+func (i IPStats) MergeWith(other IPStats) IPStats {
+	i.Size += other.Size
+	i.Requests += other.Requests
+	if i.LastURL == other.LastURL {
+		if other.LastURLAccess.After(i.LastURLAccess) {
+			i.LastURLAccess = other.LastURLAccess
+		}
+		if other.LastURLUpdate.Before(i.LastURLUpdate) {
+			i.LastURLUpdate = other.LastURLUpdate
+		}
+	} else if other.LastURLUpdate.After(i.LastURLUpdate) {
+		i.LastURL = other.LastURL
+		i.LastURLUpdate = other.LastURLUpdate
+		i.LastURLAccess = other.LastURLAccess
+	}
+	return i
+}
+
 type StatKey struct {
 	Server string
 	Prefix netip.Prefix
@@ -77,6 +95,7 @@ type Analyzer struct {
 
 type AnalyzerConfig struct {
 	Absolute   bool
+	Group      bool
 	LogOutput  string
 	NoNetstat  bool
 	Parser     string
@@ -96,6 +115,7 @@ type AnalyzerConfig struct {
 
 func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet) {
 	flags.BoolVarP(&c.Absolute, "absolute", "a", c.Absolute, "Show absolute time for each item")
+	flags.BoolVarP(&c.Group, "group", "g", c.Group, "Try to group CIDRs")
 	flags.StringVarP(&c.LogOutput, "outlog", "o", c.LogOutput, "Change log output file")
 	flags.BoolVarP(&c.NoNetstat, "no-netstat", "", c.NoNetstat, "Do not detect active connections")
 	flags.StringVarP(&c.Parser, "parser", "p", c.Parser, "Log parser (see \"ayano list parsers\")")
@@ -143,6 +163,9 @@ func NewAnalyzer(c AnalyzerConfig) (*Analyzer, error) {
 		}
 		c.LogOutput = f.Name()
 		logger.SetOutput(f)
+	}
+	if c.Analyze {
+		logger.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
 	}
 
 	return &Analyzer{
@@ -286,18 +309,8 @@ func (a *Analyzer) GetActiveConns(activeConn map[netip.Prefix]int) {
 	}
 }
 
-func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag, serverFilter string) {
-	activeConn := make(map[netip.Prefix]int)
-	if !a.Config.NoNetstat {
-		a.GetActiveConns(activeConn)
-	}
-
-	if a.Config.UseLock() {
-		a.mu.Lock()
-		defer a.mu.Unlock()
-	}
-
-	// sort stats key by value
+// SortedKeys returns stat keys sorted by value
+func (a *Analyzer) SortedKeys(sortBy SortByFlag, serverFilter string) []StatKey {
 	keys := make([]StatKey, 0)
 	for s := range a.stats {
 		if s.Server != serverFilter {
@@ -309,6 +322,21 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 	if sortFunc != nil {
 		slices.SortFunc(keys, sortFunc)
 	}
+	return keys
+}
+
+func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag, serverFilter string) {
+	activeConn := make(map[netip.Prefix]int)
+	if !a.Config.NoNetstat {
+		a.GetActiveConns(activeConn)
+	}
+
+	if a.Config.UseLock() {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+	}
+
+	keys := a.SortedKeys(sortBy, serverFilter)
 
 	// print top N
 	top := a.Config.TopN
@@ -317,6 +345,48 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 	} else if a.Config.TopN == 0 {
 		// no limit
 		top = len(keys)
+	}
+
+	if a.Config.Group {
+		groupedKeys := make(map[StatKey]struct{})
+		for _, key := range keys {
+			if key.Prefix.Bits() == 0 {
+				continue
+			}
+			adjacentKey := StatKey{key.Server, AdjacentPrefix(key.Prefix)}
+			_, ok := groupedKeys[adjacentKey]
+			if !ok {
+				// would insert into groupedKeys
+				if len(groupedKeys) >= top {
+					break
+				}
+				groupedKeys[key] = struct{}{}
+			}
+			for ok {
+				newStat := a.stats[key].MergeWith(a.stats[adjacentKey])
+				mergedPrefix := netip.PrefixFrom(key.Prefix.Addr(), key.Prefix.Bits()-1).Masked()
+				newKey := StatKey{key.Server, mergedPrefix}
+
+				a.stats[newKey] = newStat
+				delete(a.stats, key)
+				delete(a.stats, adjacentKey)
+
+				groupedKeys[newKey] = struct{}{}
+				delete(groupedKeys, key)
+				delete(groupedKeys, adjacentKey)
+
+				if newKey.Prefix.Bits() == 0 {
+					break
+				}
+				key = newKey
+				adjacentKey = StatKey{key.Server, AdjacentPrefix(key.Prefix)}
+				_, ok = groupedKeys[adjacentKey]
+			}
+		}
+		keys = a.SortedKeys(sortBy, serverFilter)
+		if len(keys) < top {
+			top = len(keys)
+		}
 	}
 
 	for i := range top {
