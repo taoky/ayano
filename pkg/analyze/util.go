@@ -97,6 +97,9 @@ func TruncateURLPath(input string) string {
 	}
 	parts := strings.Split(input, "/")
 	if parts[len(parts)-1] == "" {
+		if count == 3 {
+			return input
+		}
 		count--
 		parts[count] += "/"
 	}

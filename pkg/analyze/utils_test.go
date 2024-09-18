@@ -18,3 +18,16 @@ func TestAdjacentPrefix(t *testing.T) {
 	assertAdjacentPrefix(t, "2001:db8:114:514::/64", "2001:db8:114:515::/64")
 	assertAdjacentPrefix(t, "2001:db8:114:514::/63", "2001:db8:114:516::/63")
 }
+
+func TestTruncateURLPath(t *testing.T) {
+	testCases := [][2]string{
+		{"/example/a/b/c/d/e/file.ext", "/example/.../file.ext"},
+		{"/example/a/b/c/d/e/dir/", "/example/.../dir/"},
+		{"/short/", "/short/"},
+		{"/short/file.ext", "/short/file.ext"},
+		{"/short/dir/", "/short/dir/"},
+	}
+	for _, c := range testCases {
+		assert.Equal(t, c[1], TruncateURLPath(c[0]))
+	}
+}
