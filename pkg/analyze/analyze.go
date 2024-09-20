@@ -267,16 +267,20 @@ func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
 		}
 		a.stats[key] = a.stats[key].UpdateWith(logItem)
 	}
-	updateStats(StatKey{logItem.Server, clientPrefix})
 
-	// Write it twice (to total here) when we have multiple servers
-	if logItem.Server != "" {
-		updateStats(StatKey{"", clientPrefix})
+	if a.Config.Analyze || a.Config.Daemon {
+		// Avoid using double memory when not in interactive mode
+		updateStats(StatKey{a.Config.Server, clientPrefix})
+	} else {
+		updateStats(StatKey{logItem.Server, clientPrefix})
+
+		// Write it twice (to total here) when we have multiple servers
+		if logItem.Server != "" {
+			updateStats(StatKey{"", clientPrefix})
+		}
 	}
 
 	if a.Config.Daemon {
-		// If user does not provide a Config.Server, it would be "" -> total
-		// and if user provides one, logItem.Server would just equal to a.Config.Server
 		ipStats := a.stats[StatKey{a.Config.Server, clientPrefix}]
 		delta := ipStats.Size - ipStats.LastSize
 		if ipStats.LastSize == 0 {
