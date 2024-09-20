@@ -3,6 +3,8 @@ package parser
 import (
 	"math"
 	"time"
+
+	"github.com/goccy/go-json"
 )
 
 func init() {

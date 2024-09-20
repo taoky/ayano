@@ -4,6 +4,8 @@ import (
 	"math"
 	"strings"
 	"time"
+
+	"github.com/goccy/go-json"
 )
 
 func init() {
