@@ -18,4 +18,5 @@ func TestNginxJsonParser(t *testing.T) {
 	as.Equal("/path/to/a/file", log.URL)
 	expectedTime := time.Unix(1678551332, 293000000)
 	as.WithinDuration(expectedTime, log.Time, time.Microsecond)
+	as.Equal("", log.Useragent)
 }

@@ -40,6 +40,16 @@ type IPStats struct {
 
 	// Record time of last URL access
 	LastURLAccess time.Time
+
+	// User-agent
+	UAStore map[string]struct{}
+}
+
+func (i IPStats) Init() IPStats {
+	if i.UAStore == nil {
+		i.UAStore = make(map[string]struct{})
+	}
+	return i
 }
 
 func (i IPStats) UpdateWith(item parser.LogItem) IPStats {
@@ -55,6 +65,11 @@ func (i IPStats) UpdateWith(item parser.LogItem) IPStats {
 		if i.LastURLAccess.Before(item.Time) {
 			i.LastURLAccess = item.Time
 		}
+	}
+	if len(item.Useragent) <= 50 {
+		i.UAStore[item.Useragent] = struct{}{}
+	} else {
+		i.UAStore[item.Useragent[:50]] = struct{}{}
 	}
 	return i
 }
@@ -73,6 +88,9 @@ func (i IPStats) MergeWith(other IPStats) IPStats {
 		i.LastURL = other.LastURL
 		i.LastURLUpdate = other.LastURLUpdate
 		i.LastURLAccess = other.LastURLAccess
+	}
+	for k := range other.UAStore {
+		i.UAStore[k] = struct{}{}
 	}
 	return i
 }
@@ -244,6 +262,9 @@ func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
 	}
 
 	updateStats := func(key StatKey) {
+		if _, exists := a.stats[key]; !exists {
+			a.stats[key] = IPStats{}.Init()
+		}
 		a.stats[key] = a.stats[key].UpdateWith(logItem)
 	}
 	updateStats(StatKey{logItem.Server, clientPrefix})
@@ -395,6 +416,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		total := ipStats.Size
 		reqTotal := ipStats.Requests
 		last := ipStats.LastURL
+		agents := len(ipStats.UAStore)
 		if a.Config.Truncate {
 			last = TruncateURLPath(last)
 		}
@@ -434,8 +456,8 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 				connection = "     "
 			}
 		}
-		a.logger.Printf("%s%16s%s: %7s %3d %7s %s (from %s, last accessed %s)%s\n", fmtStart, key.Prefix, connection, humanize.IBytes(total), reqTotal,
-			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime, fmtEnd)
+		a.logger.Printf("%s%16s%s: %7s %3d %7s %s (from %s, last %s, %d agents)%s\n", fmtStart, key.Prefix, connection, humanize.IBytes(total), reqTotal,
+			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime, agents, fmtEnd)
 		if displayRecord != nil {
 			displayRecord[key.Prefix] = ipStats.LastURLAccess
 		}

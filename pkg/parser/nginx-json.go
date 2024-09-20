@@ -28,6 +28,7 @@ type NginxJSONLog struct {
 	Url       string  `json:"url"`
 	Timestamp float64 `json:"timestamp"`
 	ServerIP  string  `json:"serverip"`
+	Useragent string  `json:"user_agent"`
 }
 
 func ParseNginxJSON(line []byte) (LogItem, error) {
@@ -39,10 +40,11 @@ func ParseNginxJSON(line []byte) (LogItem, error) {
 	sec, dec := math.Modf(logItem.Timestamp)
 	t := time.Unix(int64(sec), int64(dec*1e9))
 	return LogItem{
-		Size:   logItem.Size,
-		Client: logItem.Client,
-		Time:   t,
-		URL:    logItem.Url,
-		Server: logItem.ServerIP,
+		Size:      logItem.Size,
+		Client:    logItem.Client,
+		Time:      t,
+		URL:       logItem.Url,
+		Server:    logItem.ServerIP,
+		Useragent: logItem.Useragent,
 	}, nil
 }

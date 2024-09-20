@@ -8,11 +8,12 @@ import (
 )
 
 type LogItem struct {
-	Size   uint64
-	Client string
-	Time   time.Time
-	URL    string
-	Server string
+	Size      uint64
+	Client    string
+	Time      time.Time
+	URL       string
+	Server    string
+	Useragent string
 }
 
 type Parser interface {
