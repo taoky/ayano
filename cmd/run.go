@@ -106,22 +106,35 @@ func analyzeCmd() *cobra.Command {
 	config := analyze.DefaultConfig()
 	config.InstallFlags(cmd.Flags())
 
-	var pprofFile string
-	cmd.Flags().StringVar(&pprofFile, "pprof", "", "write pprof data to file")
+	var cpuProf string
+	var memProf string
+	cmd.Flags().StringVar(&cpuProf, "cpuprof", "", "write CPU pprof data to file")
+	cmd.Flags().StringVar(&memProf, "memprof", "", "write memory pprof data to file")
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		config.Analyze = true
-		if pprofFile != "" {
-			f, err := os.Create(pprofFile)
+		if cpuProf != "" {
+			f, err := os.Create(cpuProf)
 			if err != nil {
-				return fmt.Errorf("failed to create pprof file: %w", err)
+				return fmt.Errorf("failed to create CPU pprof file: %w", err)
 			}
 			defer f.Close()
 			if err := pprof.StartCPUProfile(f); err != nil {
-				return fmt.Errorf("failed to start pprof: %w", err)
+				return fmt.Errorf("failed to start CPU pprof: %w", err)
 			}
 			defer pprof.StopCPUProfile()
 		}
-		return runWithConfig(cmd, args, config)
+		err := runWithConfig(cmd, args, config)
+		if memProf != "" {
+			f, err := os.Create(memProf)
+			if err != nil {
+				return fmt.Errorf("failed to create memory pprof file: %w", err)
+			}
+			defer f.Close()
+			if err := pprof.WriteHeapProfile(f); err != nil {
+				return fmt.Errorf("failed to write memory pprof: %w", err)
+			}
+		}
+		return err
 	}
 	return cmd
 }
