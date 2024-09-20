@@ -45,13 +45,6 @@ type IPStats struct {
 	UAStore map[string]struct{}
 }
 
-func (i IPStats) Init() IPStats {
-	if i.UAStore == nil {
-		i.UAStore = make(map[string]struct{})
-	}
-	return i
-}
-
 func (i IPStats) UpdateWith(item parser.LogItem) IPStats {
 	i.Size += item.Size
 	i.Requests += 1
@@ -65,6 +58,9 @@ func (i IPStats) UpdateWith(item parser.LogItem) IPStats {
 		if i.LastURLAccess.Before(item.Time) {
 			i.LastURLAccess = item.Time
 		}
+	}
+	if i.UAStore == nil {
+		i.UAStore = make(map[string]struct{})
 	}
 	if len(item.Useragent) <= 50 {
 		i.UAStore[item.Useragent] = struct{}{}
@@ -262,9 +258,6 @@ func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
 	}
 
 	updateStats := func(key StatKey) {
-		if _, exists := a.stats[key]; !exists {
-			a.stats[key] = IPStats{}.Init()
-		}
 		a.stats[key] = a.stats[key].UpdateWith(logItem)
 	}
 
