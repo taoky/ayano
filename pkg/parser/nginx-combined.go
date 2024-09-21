@@ -168,8 +168,9 @@ func ParseNginxCombined(line []byte) (LogItem, error) {
 	}, nil
 }
 
-// 1       2         3          4      5    6                7     8      9         10
-var nginxCombinedRe = regexp.MustCompile(`^(\S+) - ([^[]+) \[([^]]+)\] "([^ ]+ )?([^ ]+)( HTTP/[\d.]+)?" (\d+) (\d+) "([^"]*)" "([^"]*)"\s*$`)
+var nginxCombinedRe = regexp.MustCompile(
+	//1       2         3          4        5      6                7     8      9                  10
+	`^(\S+) - ([^[]+) \[([^]]+)\] "([^ ]+ )?([^ ]+)( HTTP/[\d.]+)?" (\d+) (\d+) "((?:[^\"]|\\.)*)" "((?:[^\"]|\\.)*)"\s*$`)
 
 func ParseNginxCombinedRegex(line []byte) (LogItem, error) {
 	m := nginxCombinedRe.FindStringSubmatch(string(line))
