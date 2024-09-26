@@ -464,7 +464,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 
 		if !a.Config.NoNetstat {
 			if _, ok := activeConn[key.Prefix]; ok {
-				row[1] = fmt.Sprintf("(%2d)", activeConn[key.Prefix])
+				row[1] = strconv.Itoa(activeConn[key.Prefix])
 			}
 		} else {
 			// Remove connections column
