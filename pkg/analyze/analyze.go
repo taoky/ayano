@@ -454,13 +454,12 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 			key.Prefix.String(), "", humanize.IBytes(total), strconv.FormatUint(reqTotal, 10),
 			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime,
 		}
-		rowColors := slices.Concat(
-			// Bold color for 2nd column (connections)
-			[]tablewriter.Colors{tableColorNone, tableColorBold},
-			slices.Repeat([]tablewriter.Colors{tableColorNone}, len(row)-2),
-		)
+		rowColors := slices.Repeat([]tablewriter.Colors{tableColorNone}, len(row))
 		if boldLine {
 			rowColors = slices.Repeat([]tablewriter.Colors{tableColorBold}, len(row))
+		} else {
+			// Bold color for 2nd column (connections)
+			rowColors[1] = tableColorBold
 		}
 
 		if !a.Config.NoNetstat {
