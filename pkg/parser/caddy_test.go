@@ -18,4 +18,5 @@ func TestCaddyJSONParser(t *testing.T) {
 	as.Equal("127.0.0.1", log.Client)
 	expectedTime := time.Unix(1646861401, 524102400)
 	as.WithinDuration(expectedTime, log.Time, time.Microsecond)
+	as.Equal("curl/7.82.0", log.Useragent)
 }

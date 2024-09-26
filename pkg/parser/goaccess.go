@@ -46,10 +46,11 @@ func (p GoAccessFormatParser) Parse(line []byte) (LogItem, error) {
 	}
 
 	return LogItem{
-		Size:   glogitem.RespSize,
-		Client: glogitem.Host,
-		Time:   glogitem.Dt,
-		URL:    glogitem.Req,
-		Server: glogitem.Server,
+		Size:      glogitem.RespSize,
+		Client:    glogitem.Host,
+		Time:      glogitem.Dt,
+		URL:       glogitem.Req,
+		Server:    glogitem.Server,
+		Useragent: glogitem.Agent,
 	}, nil
 }

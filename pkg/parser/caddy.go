@@ -2,7 +2,10 @@ package parser
 
 import (
 	"math"
+	"strings"
 	"time"
+
+	"github.com/goccy/go-json"
 )
 
 func init() {
@@ -23,10 +26,15 @@ func init() {
 	})
 }
 
+type CaddyJsonLogHeader struct {
+	Useragent []string `json:"User-Agent"`
+}
+
 type CaddyJsonLogRequest struct {
-	RemoteIP string `json:"remote_ip"`
-	ClientIP string `json:"client_ip"`
-	Uri      string `json:"uri"`
+	RemoteIP string             `json:"remote_ip"`
+	ClientIP string             `json:"client_ip"`
+	Uri      string             `json:"uri"`
+	Headers  CaddyJsonLogHeader `json:"headers"`
 }
 
 type CaddyJsonLog struct {
@@ -52,9 +60,10 @@ func ParseCaddyJSON(line []byte) (LogItem, error) {
 		client = logItem.Request.RemoteIP
 	}
 	return LogItem{
-		Size:   logItem.Size,
-		Client: client,
-		Time:   t,
-		URL:    logItem.Request.Uri,
+		Size:      logItem.Size,
+		Client:    client,
+		Time:      t,
+		URL:       logItem.Request.Uri,
+		Useragent: strings.Join(logItem.Request.Headers.Useragent, ", "),
 	}, nil
 }

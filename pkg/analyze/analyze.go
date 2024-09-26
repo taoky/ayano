@@ -45,6 +45,9 @@ type IPStats struct {
 
 	// Record time of last URL access
 	LastURLAccess time.Time
+
+	// User-agent
+	UAStore map[string]struct{}
 }
 
 func (i IPStats) UpdateWith(item parser.LogItem) IPStats {
@@ -60,6 +63,14 @@ func (i IPStats) UpdateWith(item parser.LogItem) IPStats {
 		if i.LastURLAccess.Before(item.Time) {
 			i.LastURLAccess = item.Time
 		}
+	}
+	if i.UAStore == nil {
+		i.UAStore = make(map[string]struct{})
+	}
+	if len(item.Useragent) <= 50 {
+		i.UAStore[item.Useragent] = struct{}{}
+	} else {
+		i.UAStore[item.Useragent[:50]] = struct{}{}
 	}
 	return i
 }
@@ -78,6 +89,9 @@ func (i IPStats) MergeWith(other IPStats) IPStats {
 		i.LastURL = other.LastURL
 		i.LastURLUpdate = other.LastURLUpdate
 		i.LastURLAccess = other.LastURLAccess
+	}
+	for k := range other.UAStore {
+		i.UAStore[k] = struct{}{}
 	}
 	return i
 }
@@ -251,16 +265,20 @@ func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
 	updateStats := func(key StatKey) {
 		a.stats[key] = a.stats[key].UpdateWith(logItem)
 	}
-	updateStats(StatKey{logItem.Server, clientPrefix})
 
-	// Write it twice (to total here) when we have multiple servers
-	if logItem.Server != "" {
-		updateStats(StatKey{"", clientPrefix})
+	if a.Config.Analyze || a.Config.Daemon {
+		// Avoid using double memory when not in interactive mode
+		updateStats(StatKey{a.Config.Server, clientPrefix})
+	} else {
+		updateStats(StatKey{logItem.Server, clientPrefix})
+
+		// Write it twice (to total here) when we have multiple servers
+		if logItem.Server != "" {
+			updateStats(StatKey{"", clientPrefix})
+		}
 	}
 
 	if a.Config.Daemon {
-		// If user does not provide a Config.Server, it would be "" -> total
-		// and if user provides one, logItem.Server would just equal to a.Config.Server
 		ipStats := a.stats[StatKey{a.Config.Server, clientPrefix}]
 		delta := ipStats.Size - ipStats.LastSize
 		if ipStats.LastSize == 0 {
@@ -414,8 +432,9 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		tablewriter.ALIGN_DEFAULT,
 		tablewriter.ALIGN_DEFAULT,
 		tablewriter.ALIGN_DEFAULT,
+		tablewriter.ALIGN_RIGHT,
 	}
-	tHeaders := []string{"CIDR", "Conn", "Bytes", "Reqs", "Avg", "URL", "URL Since", "URL Last"}
+	tHeaders := []string{"CIDR", "Conn", "Bytes", "Reqs", "Avg", "URL", "URL Since", "URL Last", "UA"}
 	if a.Config.NoNetstat {
 		tAlignment = append(tAlignment[:1], tAlignment[2:]...)
 		tHeaders = append(tHeaders[:1], tHeaders[2:]...)
@@ -429,6 +448,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		total := ipStats.Size
 		reqTotal := ipStats.Requests
 		last := ipStats.LastURL
+		agents := len(ipStats.UAStore)
 		if a.Config.Truncate {
 			last = TruncateURLPath(last)
 		}
@@ -452,7 +472,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 
 		row := []string{
 			key.Prefix.String(), "", humanize.IBytes(total), strconv.FormatUint(reqTotal, 10),
-			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime,
+			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime, strconv.Itoa(agents),
 		}
 		rowColors := slices.Repeat([]tablewriter.Colors{tableColorNone}, len(row))
 		if boldLine {

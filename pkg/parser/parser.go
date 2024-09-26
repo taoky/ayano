@@ -3,16 +3,15 @@ package parser
 import (
 	"errors"
 	"time"
-
-	jsoniter "github.com/json-iterator/go"
 )
 
 type LogItem struct {
-	Size   uint64
-	Client string
-	Time   time.Time
-	URL    string
-	Server string
+	Size      uint64
+	Client    string
+	Time      time.Time
+	URL       string
+	Server    string
+	Useragent string
 }
 
 type Parser interface {
@@ -35,7 +34,6 @@ type ParserMeta struct {
 }
 
 var (
-	json                  = jsoniter.ConfigCompatibleWithStandardLibrary
 	ErrExpectedIgnoredLog = errors.New("ignored")
 
 	registry = make(map[string]ParserMeta)

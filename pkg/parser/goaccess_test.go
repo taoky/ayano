@@ -38,4 +38,5 @@ func TestGoAccessParser(t *testing.T) {
 	expectedTime := time.Unix(1646861401, 0)
 	as.WithinDuration(expectedTime, log.Time, 0)
 	as.Equal("1.3.5.7", log.Server)
+	as.Equal("curl/7.82.0", log.Useragent)
 }

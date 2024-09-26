@@ -1,6 +1,6 @@
 ayano
 ayano-*
 ayano.test
-cpu.pprof
+*.pprof
 __debug_bin*
 /dist/

@@ -120,6 +120,20 @@ Ayano supports two types of nginx log:
 
 4. GoAccess format string. You shall set `GOACCESS_CONFIG` env to a goaccess config file beforehand ([format recognized](https://github.com/taoky/goaccessfmt?tab=readme-ov-file#config-file-format), [example](assets/goaccess.conf)).
 
+## Note
+
+### Memory footprint
+
+If you have literally A LOT OF logs to analyze, and you're running ayano on a server with very low RAM, you could use `systemd-run` to restrict its memory footprint like this:
+
+```shell
+GOMEMLIMIT=270MiB systemd-run --user --scope -p MemoryMax=300M ayano analyze ...
+```
+
+`GOMEMLIMIT` is a soft limit -- it helps go runtime GC to do its job more aggressively when it would reach the limit (at the cost of more CPU time). Please read [A Guide to the Go Garbage Collector](https://tip.golang.org/doc/gc-guide#Memory_limit) for more information.
+
+Also, when in interactive mode (`ayano run`), `ayano` might take double memory if log format has server IP set, to support filtering by server IP without restarting.
+
 ## Naming
 
 Ayano is named after *Sugiura Ayano*, the Student Council vice-president in [*Yuru Yuri*](https://en.wikipedia.org/wiki/YuruYuri#Student_Council).
