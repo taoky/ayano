@@ -405,6 +405,16 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 	table.SetHeaderLine(false)
 	table.SetBorder(false)
 	table.SetNoWhiteSpace(true)
+	table.SetColumnAlignment([]int{
+		tablewriter.ALIGN_RIGHT,
+		tablewriter.ALIGN_RIGHT,
+		tablewriter.ALIGN_RIGHT,
+		tablewriter.ALIGN_RIGHT,
+		tablewriter.ALIGN_RIGHT,
+		tablewriter.ALIGN_DEFAULT,
+		tablewriter.ALIGN_DEFAULT,
+		tablewriter.ALIGN_DEFAULT,
+	})
 	table.SetHeader([]string{"CIDR", "Conn", "Bytes", "Reqs", "Avg", "URL", "URL Since", "URL Last"})
 
 	for i := range top {
