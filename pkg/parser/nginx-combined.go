@@ -26,12 +26,12 @@ func init() {
 	newFuncRegex := func() Parser { return ParserFunc(ParseNginxCombinedRegex) }
 	RegisterParser(ParserMeta{
 		Name:        "nginx-combined-regex",
-		Description: "(Deprecated) For nginx's default `combined` format, using regular expressions",
+		Description: "For nginx's default `combined` format, using regular expressions",
 		F:           newFuncRegex,
 	})
 	RegisterParser(ParserMeta{
 		Name:        "combined-regex",
-		Description: "(Deprecated) An alias for `nginx-combined-regex`",
+		Description: "An alias for `nginx-combined-regex`",
 		Hidden:      true,
 		F:           newFuncRegex,
 	})
