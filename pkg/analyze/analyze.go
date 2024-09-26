@@ -7,11 +7,14 @@ import (
 	"net/netip"
 	"os"
 	"slices"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/cakturk/go-netstat/netstat"
 	"github.com/dustin/go-humanize"
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/pflag"
 	"github.com/taoky/ayano/pkg/fileiter"
 	"github.com/taoky/ayano/pkg/parser"
@@ -20,10 +23,12 @@ import (
 const (
 	oneGB = 1 << 30
 
-	boldStart = "\x1B[1m"
-	boldEnd   = "\x1B[22m"
-
 	TimeFormat = time.DateTime
+)
+
+var (
+	tableColorNone = tablewriter.Colors{tablewriter.Normal}
+	tableColorBold = tablewriter.Colors{tablewriter.Bold}
 )
 
 type IPStats struct {
@@ -389,6 +394,35 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		}
 	}
 
+	tableStr := new(strings.Builder)
+	table := tablewriter.NewWriter(tableStr)
+	table.SetCenterSeparator("  ")
+	table.SetColumnSeparator("")
+	table.SetRowSeparator("")
+	table.SetTablePadding("  ")
+	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetHeaderLine(false)
+	table.SetBorder(false)
+	table.SetNoWhiteSpace(true)
+	tAlignment := []int{
+		tablewriter.ALIGN_RIGHT,
+		tablewriter.ALIGN_RIGHT,
+		tablewriter.ALIGN_RIGHT,
+		tablewriter.ALIGN_RIGHT,
+		tablewriter.ALIGN_RIGHT,
+		tablewriter.ALIGN_DEFAULT,
+		tablewriter.ALIGN_DEFAULT,
+		tablewriter.ALIGN_DEFAULT,
+	}
+	tHeaders := []string{"CIDR", "Conn", "Bytes", "Reqs", "Avg", "URL", "URL Since", "URL Last"}
+	if a.Config.NoNetstat {
+		tAlignment = append(tAlignment[:1], tAlignment[2:]...)
+		tHeaders = append(tHeaders[:1], tHeaders[2:]...)
+	}
+	table.SetColumnAlignment(tAlignment)
+	table.SetHeader(tHeaders)
+
 	for i := range top {
 		key := keys[i]
 		ipStats := a.stats[key]
@@ -410,36 +444,41 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		}
 
 		average := total / uint64(reqTotal)
-
-		fmtStart := ""
-		fmtEnd := ""
-		connection := ""
 		boldLine := false
-
 		if displayRecord != nil && displayRecord[key.Prefix] != ipStats.LastURLAccess {
 			// display this line in bold
-			fmtStart = boldStart
-			fmtEnd = boldEnd
 			boldLine = true
 		}
+
+		row := []string{
+			key.Prefix.String(), "", humanize.IBytes(total), strconv.FormatUint(reqTotal, 10),
+			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime,
+		}
+		rowColors := slices.Repeat([]tablewriter.Colors{tableColorNone}, len(row))
+		if boldLine {
+			rowColors = slices.Repeat([]tablewriter.Colors{tableColorBold}, len(row))
+		} else {
+			// Bold color for 2nd column (connections)
+			rowColors[1] = tableColorBold
+		}
+
 		if !a.Config.NoNetstat {
 			if _, ok := activeConn[key.Prefix]; ok {
-				activeString := fmt.Sprintf(" (%2d)", activeConn[key.Prefix])
-				if !boldLine {
-					connection = fmt.Sprintf("%s%s%s", boldStart, activeString, boldEnd)
-				} else {
-					connection = activeString
-				}
-			} else {
-				connection = "     "
+				row[1] = strconv.Itoa(activeConn[key.Prefix])
 			}
+		} else {
+			// Remove connections column
+			row = append(row[:1], row[2:]...)
+			rowColors = append(rowColors[:1], rowColors[2:]...)
 		}
-		a.logger.Printf("%s%16s%s: %7s %3d %7s %s (from %s, last accessed %s)%s\n", fmtStart, key.Prefix, connection, humanize.IBytes(total), reqTotal,
-			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime, fmtEnd)
+
+		table.Rich(row, rowColors)
 		if displayRecord != nil {
 			displayRecord[key.Prefix] = ipStats.LastURLAccess
 		}
 	}
+	table.Render()
+	a.logger.Writer().Write([]byte(tableStr.String()))
 }
 
 func (a *Analyzer) GetCurrentServers() []string {
