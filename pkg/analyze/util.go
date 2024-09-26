@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -91,17 +93,88 @@ func AdjacentPrefix(p netip.Prefix) netip.Prefix {
 }
 
 func TruncateURLPath(input string) string {
-	count := strings.Count(input, "/")
-	if count <= 2 {
-		return input
+	parts := strings.SplitN(input, "?", 2)
+	path := parts[0]
+	args := ""
+	if len(parts) == 2 {
+		args = "?..."
 	}
-	parts := strings.Split(input, "/")
+	count := strings.Count(path, "/")
+	if count <= 2 {
+		return input + args
+	}
+	parts = strings.Split(path, "/")
 	if parts[len(parts)-1] == "" {
 		if count == 3 {
-			return input
+			return path + args
 		}
 		count--
 		parts[count] += "/"
 	}
-	return fmt.Sprintf("/%s/.../%s", parts[1], parts[count])
+	return fmt.Sprintf("/%s/.../%s%s", parts[1], parts[count], args)
+}
+
+func TruncateURLPathLen(input string, target int) string {
+	stub := TruncateURLPath(input)
+	if len(stub) <= target {
+		return stub
+	}
+
+	// if removing query string suffices, do it
+	parts := strings.SplitN(stub, "?", 2)
+	stub = parts[0]
+	if len(stub) < target {
+		return stub + "?"
+	} else if len(stub) == target {
+		return stub
+	}
+
+	// stub contains at most 3 slashes
+	parts = strings.SplitN(stub, "/", 4)
+	filename := parts[len(parts)-1]
+	isDirectory := false
+	if filename == "" {
+		isDirectory = true
+		filename = parts[len(parts)-2]
+	}
+	filenameTarget := len(filename) - (len(stub) - target)
+	if filenameTarget > 0 {
+		filename = TruncateFilenameLen(filename, filenameTarget)
+		if isDirectory {
+			parts[len(parts)-2] = filename
+		} else {
+			parts[len(parts)-1] = filename
+		}
+		return strings.Join(parts, "/")
+	}
+
+	// give up and truncate directly
+	return stub[:target]
+}
+
+var compressionSuffixes = []string{".gz", ".bz2", ".xz", ".zst"}
+
+func TruncateFilenameLen(input string, target int) string {
+	if len(input) <= target {
+		return input
+	}
+	ext := filepath.Ext(input)
+	if slices.Contains(compressionSuffixes, ext) {
+		ext = filepath.Ext(strings.TrimSuffix(input, ext)) + ext
+	}
+	basename := strings.TrimSuffix(input, ext)
+	if len(basename) > len(input)-target {
+		toTruncate := len(basename) - (len(input) - target)
+		if ext != "" && toTruncate > 2 {
+			// ext will begin with a dot already
+			return basename[:toTruncate-2] + ".." + ext
+		} else if toTruncate > 3 {
+			return basename[:toTruncate-3] + "..."
+		} else {
+			// basename too short, keep just an asterisk
+			return "*" + ext
+		}
+	}
+	// truncating basename alone would not suffice, keep characters from end
+	return input[len(input)-target:]
 }
