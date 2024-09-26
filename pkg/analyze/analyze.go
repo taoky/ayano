@@ -405,7 +405,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 	table.SetHeaderLine(false)
 	table.SetBorder(false)
 	table.SetNoWhiteSpace(true)
-	table.SetColumnAlignment([]int{
+	tAlignment := []int{
 		tablewriter.ALIGN_RIGHT,
 		tablewriter.ALIGN_RIGHT,
 		tablewriter.ALIGN_RIGHT,
@@ -414,8 +414,14 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		tablewriter.ALIGN_DEFAULT,
 		tablewriter.ALIGN_DEFAULT,
 		tablewriter.ALIGN_DEFAULT,
-	})
-	table.SetHeader([]string{"CIDR", "Conn", "Bytes", "Reqs", "Avg", "URL", "URL Since", "URL Last"})
+	}
+	tHeaders := []string{"CIDR", "Conn", "Bytes", "Reqs", "Avg", "URL", "URL Since", "URL Last"}
+	if a.Config.NoNetstat {
+		tAlignment = append(tAlignment[:1], tAlignment[2:]...)
+		tHeaders = append(tHeaders[:1], tHeaders[2:]...)
+	}
+	table.SetColumnAlignment(tAlignment)
+	table.SetHeader(tHeaders)
 
 	for i := range top {
 		key := keys[i]
@@ -438,34 +444,36 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		}
 
 		average := total / uint64(reqTotal)
-
-		connection := ""
 		boldLine := false
-
 		if displayRecord != nil && displayRecord[key.Prefix] != ipStats.LastURLAccess {
 			// display this line in bold
 			boldLine = true
 		}
-		if !a.Config.NoNetstat {
-			if _, ok := activeConn[key.Prefix]; ok {
-				connection = fmt.Sprintf("(%2d)", activeConn[key.Prefix])
-			} else {
-				connection = "     "
-			}
-		}
+
 		row := []string{
-			key.Prefix.String(), connection, humanize.IBytes(total), strconv.FormatUint(reqTotal, 10),
+			key.Prefix.String(), "", humanize.IBytes(total), strconv.FormatUint(reqTotal, 10),
 			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime,
 		}
+		rowColors := slices.Concat(
+			// Bold color for 2nd column (connections)
+			[]tablewriter.Colors{tableColorNone, tableColorBold},
+			slices.Repeat([]tablewriter.Colors{tableColorNone}, len(row)-2),
+		)
 		if boldLine {
-			table.Rich(row, slices.Repeat([]tablewriter.Colors{tableColorNone}, len(row)))
-		} else {
-			table.Rich(row, slices.Concat(
-				// Bold color for 2nd column (connections)
-				[]tablewriter.Colors{tableColorNone, tableColorBold},
-				slices.Repeat([]tablewriter.Colors{tableColorNone}, len(row)-2),
-			))
+			rowColors = slices.Repeat([]tablewriter.Colors{tableColorBold}, len(row))
 		}
+
+		if !a.Config.NoNetstat {
+			if _, ok := activeConn[key.Prefix]; ok {
+				row[1] = fmt.Sprintf("(%2d)", activeConn[key.Prefix])
+			}
+		} else {
+			// Remove connections column
+			row = append(row[:1], row[2:]...)
+			rowColors = append(rowColors[:1], rowColors[2:]...)
+		}
+
+		table.Rich(row, rowColors)
 		if displayRecord != nil {
 			displayRecord[key.Prefix] = ipStats.LastURLAccess
 		}
