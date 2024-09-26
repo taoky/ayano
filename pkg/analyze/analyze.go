@@ -7,11 +7,14 @@ import (
 	"net/netip"
 	"os"
 	"slices"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/cakturk/go-netstat/netstat"
 	"github.com/dustin/go-humanize"
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/pflag"
 	"github.com/taoky/ayano/pkg/fileiter"
 	"github.com/taoky/ayano/pkg/parser"
@@ -389,6 +392,19 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		}
 	}
 
+	tableStr := new(strings.Builder)
+	table := tablewriter.NewWriter(tableStr)
+	table.SetCenterSeparator("  ")
+	table.SetColumnSeparator("")
+	table.SetRowSeparator("")
+	table.SetTablePadding("  ")
+	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetHeaderLine(false)
+	table.SetBorder(false)
+	table.SetNoWhiteSpace(true)
+	table.SetHeader([]string{"CIDR", "Conn", "Bytes", "Reqs", "Avg", "URL", "URL Since", "URL Last"})
+
 	for i := range top {
 		key := keys[i]
 		ipStats := a.stats[key]
@@ -411,35 +427,38 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 
 		average := total / uint64(reqTotal)
 
-		fmtStart := ""
-		fmtEnd := ""
 		connection := ""
 		boldLine := false
 
 		if displayRecord != nil && displayRecord[key.Prefix] != ipStats.LastURLAccess {
 			// display this line in bold
-			fmtStart = boldStart
-			fmtEnd = boldEnd
 			boldLine = true
 		}
 		if !a.Config.NoNetstat {
 			if _, ok := activeConn[key.Prefix]; ok {
-				activeString := fmt.Sprintf(" (%2d)", activeConn[key.Prefix])
-				if !boldLine {
-					connection = fmt.Sprintf("%s%s%s", boldStart, activeString, boldEnd)
-				} else {
-					connection = activeString
-				}
+				connection = fmt.Sprintf("(%2d)", activeConn[key.Prefix])
 			} else {
 				connection = "     "
 			}
 		}
-		a.logger.Printf("%s%16s%s: %7s %3d %7s %s (from %s, last accessed %s)%s\n", fmtStart, key.Prefix, connection, humanize.IBytes(total), reqTotal,
-			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime, fmtEnd)
+		row := []string{
+			key.Prefix.String(), connection, humanize.IBytes(total), strconv.FormatUint(reqTotal, 10),
+			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime,
+		}
+		if boldLine {
+			table.Rich(row, slices.Repeat([]tablewriter.Colors{tablewriter.Color(tablewriter.Bold, tablewriter.FgWhiteColor)}, len(row)))
+		} else {
+			table.Rich(row, slices.Concat(
+				[]tablewriter.Colors{tablewriter.Color(), tablewriter.Color(tablewriter.Bold, tablewriter.FgWhiteColor)},
+				slices.Repeat([]tablewriter.Colors{tablewriter.Color()}, len(row)-2),
+			))
+		}
 		if displayRecord != nil {
 			displayRecord[key.Prefix] = ipStats.LastURLAccess
 		}
 	}
+	table.Render()
+	a.logger.Println(tableStr.String())
 }
 
 func (a *Analyzer) GetCurrentServers() []string {
