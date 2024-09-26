@@ -478,7 +478,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		}
 	}
 	table.Render()
-	a.logger.Print(tableStr.String())
+	a.logger.Writer().Write([]byte(tableStr.String()))
 }
 
 func (a *Analyzer) GetCurrentServers() []string {
