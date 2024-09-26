@@ -23,10 +23,12 @@ import (
 const (
 	oneGB = 1 << 30
 
-	boldStart = "\x1B[1m"
-	boldEnd   = "\x1B[22m"
-
 	TimeFormat = time.DateTime
+)
+
+var (
+	tableColorNone = tablewriter.Colors{}
+	tableColorBold = tablewriter.Colors{tablewriter.Bold, tablewriter.FgWhiteColor}
 )
 
 type IPStats struct {
@@ -446,11 +448,12 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime,
 		}
 		if boldLine {
-			table.Rich(row, slices.Repeat([]tablewriter.Colors{tablewriter.Color(tablewriter.Bold, tablewriter.FgWhiteColor)}, len(row)))
+			table.Rich(row, slices.Repeat([]tablewriter.Colors{tableColorNone}, len(row)))
 		} else {
 			table.Rich(row, slices.Concat(
-				[]tablewriter.Colors{tablewriter.Color(), tablewriter.Color(tablewriter.Bold, tablewriter.FgWhiteColor)},
-				slices.Repeat([]tablewriter.Colors{tablewriter.Color()}, len(row)-2),
+				// Bold color for 2nd column (connections)
+				[]tablewriter.Colors{tableColorNone, tableColorBold},
+				slices.Repeat([]tablewriter.Colors{tableColorNone}, len(row)-2),
 			))
 		}
 		if displayRecord != nil {
@@ -458,7 +461,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		}
 	}
 	table.Render()
-	a.logger.Println(tableStr.String())
+	a.logger.Print(tableStr.String())
 }
 
 func (a *Analyzer) GetCurrentServers() []string {
