@@ -27,8 +27,8 @@ const (
 )
 
 var (
-	tableColorNone = tablewriter.Colors{}
-	tableColorBold = tablewriter.Colors{tablewriter.Bold, tablewriter.FgWhiteColor}
+	tableColorNone = tablewriter.Colors{tablewriter.Normal}
+	tableColorBold = tablewriter.Colors{tablewriter.Bold}
 )
 
 type IPStats struct {
