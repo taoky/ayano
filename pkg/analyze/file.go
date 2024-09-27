@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/nxadm/tail"
 	"github.com/taoky/ayano/pkg/fileiter"
@@ -22,12 +23,12 @@ func filterByCommand(r io.Reader, args []string) (io.ReadCloser, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
-	go func() {
+	runtime.SetFinalizer(stdout, func(_ io.ReadCloser) {
 		cmd.Wait()
 		if closer, ok := r.(io.Closer); ok {
 			closer.Close()
 		}
-	}()
+	})
 	return stdout, err
 }
 

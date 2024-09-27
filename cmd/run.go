@@ -36,6 +36,7 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 		return errors.New("only one log file can be specified when following or daemonizing")
 	}
 	fmt.Fprintln(cmd.ErrOrStderr(), "Using log files:", filenames)
+	cmd.SilenceUsage = true
 
 	analyzer, err := analyze.NewAnalyzer(config)
 	if err != nil {
