@@ -1,6 +1,7 @@
 package analyze
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -8,7 +9,6 @@ import (
 	"os"
 	"slices"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -414,8 +414,8 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		}
 	}
 
-	tableStr := new(strings.Builder)
-	table := tablewriter.NewWriter(tableStr)
+	tableBuf := new(bytes.Buffer)
+	table := tablewriter.NewWriter(tableBuf)
 	table.SetCenterSeparator("  ")
 	table.SetColumnSeparator("")
 	table.SetRowSeparator("")
@@ -457,8 +457,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 			last = TruncateURLPath(last)
 		}
 
-		var lastUpdateTime string
-		var lastAccessTime string
+		var lastUpdateTime, lastAccessTime string
 		if a.Config.Absolute {
 			lastUpdateTime = ipStats.LastURLUpdate.Format(TimeFormat)
 			lastAccessTime = ipStats.LastURLAccess.Format(TimeFormat)
@@ -472,6 +471,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		if displayRecord != nil && displayRecord[key.Prefix] != ipStats.LastURLAccess {
 			// display this line in bold
 			boldLine = true
+			displayRecord[key.Prefix] = ipStats.LastURLAccess
 		}
 
 		row := []string{
@@ -497,12 +497,9 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		}
 
 		table.Rich(row, rowColors)
-		if displayRecord != nil {
-			displayRecord[key.Prefix] = ipStats.LastURLAccess
-		}
 	}
 	table.Render()
-	a.logger.Writer().Write([]byte(tableStr.String()))
+	a.logger.Writer().Write(tableBuf.Bytes())
 }
 
 func (a *Analyzer) GetCurrentServers() []string {
