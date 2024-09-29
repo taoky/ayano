@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -211,6 +212,51 @@ func (a *Analyzer) RunLoop(iter fileiter.Iterator) error {
 			a.logger.Printf("analyze error: %v", err)
 		}
 	}
+	return nil
+}
+
+func (a *Analyzer) RunLoopWithMultipleIterators(iters []fileiter.Iterator) error {
+	var wg sync.WaitGroup
+	linesChan := make(chan []byte, 2*len(iters))
+
+	var errorMu sync.Mutex
+	var collectedErrors []error
+
+	for _, iter := range iters {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				line, err := iter.Next()
+				if err != nil {
+					errorMu.Lock()
+					collectedErrors = append(collectedErrors, err)
+					errorMu.Unlock()
+					return
+				}
+				if line == nil {
+					return
+				}
+				linesChan <- line
+			}
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(linesChan)
+	}()
+
+	for result := range linesChan {
+		if err := a.handleLine(result); err != nil {
+			a.logger.Printf("analyze error: %v", err)
+		}
+	}
+
+	if len(collectedErrors) > 0 {
+		return errors.Join(collectedErrors...)
+	}
+
 	return nil
 }
 
