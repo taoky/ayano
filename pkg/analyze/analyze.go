@@ -1,7 +1,6 @@
 package analyze
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -9,7 +8,6 @@ import (
 	"net/netip"
 	"os"
 	"slices"
-	"strconv"
 	"sync"
 	"time"
 
@@ -468,93 +466,16 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		}
 	}
 
-	tableBuf := new(bytes.Buffer)
-	table := tablewriter.NewWriter(tableBuf)
-	table.SetCenterSeparator("  ")
-	table.SetColumnSeparator("")
-	table.SetRowSeparator("")
-	table.SetTablePadding("  ")
-	table.SetAutoFormatHeaders(false)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetNoWhiteSpace(true)
-	tAlignment := []int{
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_DEFAULT,
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_RIGHT,
+	ctx := &OutputContext{
+		TopN:   top,
+		Keys:   keys,
+		Stats:  a.stats,
+		Config: a.Config,
+
+		ActiveConn:    activeConn,
+		DisplayRecord: displayRecord,
 	}
-	tHeaders := []string{"CIDR", "Conn", "Bytes", "Reqs", "Avg", "URL", "URL Since", "URL Last", "UA"}
-	if a.Config.NoNetstat {
-		tAlignment = append(tAlignment[:1], tAlignment[2:]...)
-		tHeaders = append(tHeaders[:1], tHeaders[2:]...)
-	}
-	table.SetColumnAlignment(tAlignment)
-	table.SetHeader(tHeaders)
-
-	for i := range top {
-		key := keys[i]
-		ipStats := a.stats[key]
-		total := ipStats.Size
-		reqTotal := ipStats.Requests
-		last := ipStats.LastURL
-		agents := len(ipStats.UAStore)
-		if a.Config.Truncate2 > 0 {
-			last = TruncateURLPathLen(last, a.Config.Truncate2)
-		} else if a.Config.Truncate {
-			last = TruncateURLPath(last)
-		}
-
-		var lastUpdateTime, lastAccessTime string
-		if a.Config.Absolute {
-			lastUpdateTime = ipStats.LastURLUpdate.Format(TimeFormat)
-			lastAccessTime = ipStats.LastURLAccess.Format(TimeFormat)
-		} else {
-			lastUpdateTime = humanize.Time(ipStats.LastURLUpdate)
-			lastAccessTime = humanize.Time(ipStats.LastURLAccess)
-		}
-
-		average := total / uint64(reqTotal)
-		boldLine := false
-		if displayRecord != nil && displayRecord[key.Prefix] != ipStats.LastURLAccess {
-			// display this line in bold
-			boldLine = true
-			displayRecord[key.Prefix] = ipStats.LastURLAccess
-		}
-
-		row := []string{
-			key.Prefix.String(), "", humanize.IBytes(total), strconv.FormatUint(reqTotal, 10),
-			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime, strconv.Itoa(agents),
-		}
-		rowColors := slices.Repeat([]tablewriter.Colors{tableColorNone}, len(row))
-		if boldLine {
-			rowColors = slices.Repeat([]tablewriter.Colors{tableColorBold}, len(row))
-		} else {
-			// Bold color for 2nd column (connections)
-			rowColors[1] = tableColorBold
-		}
-
-		if !a.Config.NoNetstat {
-			if _, ok := activeConn[key.Prefix]; ok {
-				row[1] = strconv.Itoa(activeConn[key.Prefix])
-			}
-		} else {
-			// Remove connections column
-			row = append(row[:1], row[2:]...)
-			rowColors = append(rowColors[:1], rowColors[2:]...)
-		}
-
-		table.Rich(row, rowColors)
-	}
-	table.Render()
-	a.logger.Writer().Write(tableBuf.Bytes())
+	PrintTable(a.logger.Writer(), ctx)
 }
 
 func (a *Analyzer) GetCurrentServers() []string {
