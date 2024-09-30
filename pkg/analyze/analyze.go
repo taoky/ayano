@@ -132,7 +132,6 @@ type AnalyzerConfig struct {
 
 func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet, cmdname string) {
 	flags.BoolVarP(&c.Absolute, "absolute", "a", c.Absolute, "Show absolute time for each item")
-	flags.BoolVarP(&c.Group, "group", "g", c.Group, "Try to group CIDRs")
 	flags.StringVarP(&c.LogOutput, "outlog", "o", c.LogOutput, "Change log output file")
 	flags.BoolVarP(&c.NoNetstat, "no-netstat", "", c.NoNetstat, "Do not detect active connections")
 	flags.StringVarP(&c.Parser, "parser", "p", c.Parser, "Log parser (see \"ayano list parsers\")")
@@ -148,6 +147,7 @@ func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet, cmdname string) {
 
 	if cmdname == "analyze" {
 		c.Whole = true
+		flags.BoolVarP(&c.Group, "group", "g", c.Group, "Try to group CIDRs")
 		flags.BoolVarP(new(bool), "whole", "w", false, "(This flag is implied in analyze mode)")
 	} else {
 		flags.BoolVarP(&c.Whole, "whole", "w", c.Whole, "Analyze whole log file and then tail it")
