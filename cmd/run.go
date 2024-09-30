@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/taoky/ayano/pkg/analyze"
+	"github.com/taoky/ayano/pkg/fileiter"
 	"github.com/taoky/ayano/pkg/systemd"
 	"github.com/taoky/ayano/pkg/tui"
 )
@@ -31,10 +32,6 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 	}
 
 	filenames := filenamesFromArgs(args)
-	// Allow multiple files only in analyze mode
-	if !config.Analyze && len(filenames) != 1 {
-		return errors.New("only one log file can be specified when following or daemonizing")
-	}
 	fmt.Fprintln(cmd.ErrOrStderr(), "Using log files:", filenames)
 	cmd.SilenceUsage = true
 
@@ -67,9 +64,13 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 		return err
 	} else {
 		// Tail mode
-		iter, err := analyzer.OpenTailIterator(filenames[0])
-		if err != nil {
-			return err
+		var iters []fileiter.Iterator
+		for _, filename := range filenames {
+			iter, err := analyzer.OpenTailIterator(filename)
+			if err != nil {
+				return err
+			}
+			iters = append(iters, iter)
 		}
 
 		if config.Daemon {
@@ -80,15 +81,18 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 			go tui.New(analyzer).Run()
 		}
 
-		return analyzer.RunLoop(iter)
+		if len(iters) == 1 {
+			return analyzer.RunLoop(iters[0])
+		} else {
+			return analyzer.RunLoopWithMultipleIterators(iters)
+		}
 	}
 }
 
 func runCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run [filename]",
-		Short: "Run and follow the log file",
-		Args:  cobra.MaximumNArgs(1),
+		Use:   "run [filename...]",
+		Short: "Run and follow the log file(s)",
 	}
 	config := analyze.DefaultConfig()
 	config.InstallFlags(cmd.Flags(), cmd.Name())
