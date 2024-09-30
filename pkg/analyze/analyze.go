@@ -20,11 +20,7 @@ import (
 	"github.com/taoky/ayano/pkg/parser"
 )
 
-const (
-	oneGB = 1 << 30
-
-	TimeFormat = time.DateTime
-)
+const TimeFormat = time.DateTime
 
 var (
 	tableColorNone = tablewriter.Colors{tablewriter.Normal}
@@ -120,6 +116,7 @@ type AnalyzerConfig struct {
 	Parser     string
 	PrefixV4   int
 	PrefixV6   int
+	PrintDelta SizeFlag
 	RefreshSec int
 	Server     string
 	SortBy     SortByFlag
@@ -133,7 +130,7 @@ type AnalyzerConfig struct {
 	Daemon  bool
 }
 
-func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet) {
+func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet, cmdname string) {
 	flags.BoolVarP(&c.Absolute, "absolute", "a", c.Absolute, "Show absolute time for each item")
 	flags.BoolVarP(&c.Group, "group", "g", c.Group, "Try to group CIDRs")
 	flags.StringVarP(&c.LogOutput, "outlog", "o", c.LogOutput, "Change log output file")
@@ -148,7 +145,17 @@ func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet) {
 	flags.IntVarP(&c.TopN, "top", "n", c.TopN, "Number of top items to show")
 	flags.BoolVar(&c.Truncate, "truncate", c.Truncate, "Truncate long URLs from output")
 	flags.IntVar(&c.Truncate2, "truncate-to", c.Truncate2, "Truncate URLs to given length, overrides --truncate")
-	flags.BoolVarP(&c.Whole, "whole", "w", c.Whole, "Analyze whole log file and then tail it")
+
+	if cmdname == "analyze" {
+		c.Whole = true
+		flags.BoolVarP(new(bool), "whole", "w", false, "(This flag is implied in analyze mode)")
+	} else {
+		flags.BoolVarP(&c.Whole, "whole", "w", c.Whole, "Analyze whole log file and then tail it")
+	}
+
+	if cmdname == "daemon" {
+		flags.Var(&c.PrintDelta, "print-delta", "Size interval for printing lines")
+	}
 }
 func (c *AnalyzerConfig) UseLock() bool {
 	return !c.Analyze && !c.Daemon
@@ -159,6 +166,7 @@ func DefaultConfig() AnalyzerConfig {
 		Parser:     "nginx-json",
 		PrefixV4:   24,
 		PrefixV6:   48,
+		PrintDelta: SizeFlag(1e9),
 		RefreshSec: 5,
 		SortBy:     SortBySize,
 		Threshold:  SizeFlag(10e6),
@@ -286,7 +294,7 @@ func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
 		if ipStats.LastSize == 0 {
 			ipStats.FirstSeen = logItem.Time
 		}
-		printTimes := delta / oneGB
+		printTimes := delta / uint64(a.Config.PrintDelta)
 		for range printTimes {
 			a.logger.Printf("%s %s %s %s",
 				clientPrefix.String(),
@@ -294,7 +302,7 @@ func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
 				ipStats.FirstSeen.Format(TimeFormat),
 				logItem.URL)
 		}
-		ipStats.LastSize += printTimes * oneGB
+		ipStats.LastSize += printTimes * uint64(a.Config.PrintDelta)
 		// Just update [StatKey{a.Config.Server, clientPrefix}] here, as the config would not be updated runtime now
 		a.stats[StatKey{a.Config.Server, clientPrefix}] = ipStats
 	}

@@ -91,7 +91,7 @@ func runCmd() *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 	}
 	config := analyze.DefaultConfig()
-	config.InstallFlags(cmd.Flags())
+	config.InstallFlags(cmd.Flags(), cmd.Name())
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		return runWithConfig(cmd, args, config)
 	}
@@ -105,7 +105,7 @@ func analyzeCmd() *cobra.Command {
 		Short:   "Log analyse mode (no tail following, only show top N at the end, and implies --whole)",
 	}
 	config := analyze.DefaultConfig()
-	config.InstallFlags(cmd.Flags())
+	config.InstallFlags(cmd.Flags(), cmd.Name())
 
 	var cpuProf string
 	var memProf string
@@ -147,7 +147,7 @@ func daemonCmd() *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 	}
 	config := analyze.DefaultConfig()
-	config.InstallFlags(cmd.Flags())
+	config.InstallFlags(cmd.Flags(), cmd.Name())
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		config.Daemon = true
 		return runWithConfig(cmd, args, config)
