@@ -2,7 +2,7 @@ package parser
 
 import (
 	"bytes"
-	"errors"
+	"fmt"
 	"time"
 )
 
@@ -37,25 +37,34 @@ func findEndingDoubleQuote(data []byte) int {
 
 func splitFields(line []byte) ([][]byte, error) {
 	res := make([][]byte, 0, 16)
+loop:
 	for baseIdx := 0; baseIdx < len(line); {
-		if line[baseIdx] == '"' {
+		switch line[baseIdx] {
+		case '"':
 			quoteIdx := findEndingDoubleQuote(line[baseIdx+1:])
 			if quoteIdx == -1 {
-				return res, errors.New("unexpected format: unbalanced quotes")
+				return res, fmt.Errorf("unexpected format: unbalanced quotes [ at %d", baseIdx)
 			}
 			res = append(res, line[baseIdx+1:baseIdx+quoteIdx+1])
 			baseIdx += quoteIdx + 2
-			if line[baseIdx] == ' ' {
-				baseIdx++
+		case '[':
+			closingIdx := bytes.IndexByte(line[baseIdx+1:], ']')
+			if closingIdx == -1 {
+				return res, fmt.Errorf("unexpected format: unmatched [ at %d", baseIdx)
 			}
-		} else {
+			res = append(res, line[baseIdx+1:baseIdx+closingIdx+1])
+			baseIdx += closingIdx + 2
+		default:
 			spaceIdx := bytes.IndexByte(line[baseIdx:], ' ')
 			if spaceIdx == -1 {
 				res = append(res, line[baseIdx:])
-				break
+				break loop
 			}
 			res = append(res, line[baseIdx:baseIdx+spaceIdx])
-			baseIdx += spaceIdx + 1
+			baseIdx += spaceIdx
+		}
+		if baseIdx < len(line) && line[baseIdx] == ' ' {
+			baseIdx++
 		}
 	}
 	return res, nil
