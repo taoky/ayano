@@ -1,6 +1,6 @@
 # ayano
 
-Follow nginx log, and find out bad guys! Ayano parses nginx log and shows clients eating most bandwidth every few seconds.
+Follow nginx log, and find out bad guys! Ayano parses web server log and shows clients eating most bandwidth every few seconds.
 
 ## Build
 
@@ -15,31 +15,44 @@ $ ./ayano
 A simple log analysis tool for Nginx, Apache, or other web server logs
 
 Usage:
+  ayano [flags]
   ayano [command]
 
 Available Commands:
   analyze     Log analyse mode (no tail following, only show top N at the end, and implies --whole)
+  completion  Generate the autocompletion script for the specified shell
   daemon      Daemon mode, prints out IP CIDR and total size every 1 GiB
-  run         Run and follow the log file
-
-$ ./ayano run --help
-Run and follow the log file
-
-Usage:
-  ayano run [filename] [flags]
+  help        Help about any command
+  list        List various items
+  run         Run and follow the log file(s)
 
 Flags:
-  -a, --absolute         Show absolute time for each item
-  -h, --help             help for run
-      --no-netstat       Do not detect active connections
-  -o, --outlog string    Change log output file
-  -p, --parser string    Log parser (nginx-combined|nginx-json|caddy-json|goaccess) (default "nginx-json")
-  -r, --refresh int      Refresh interval in seconds (default 5)
-  -s, --server string    Server IP to filter (nginx-json only)
-  -S, --sort-by string   Sort result by (size|requests) (default "size")
-  -t, --threshold size   Threshold size for request (only requests at least this large will be counted) (default 10 MB)
-  -n, --top int          Number of top items to show (default 10)
-  -w, --whole            Analyze whole log file and then tail it
+  -h, --help   help for ayano
+
+Use "ayano [command] --help" for more information about a command.
+$ ./ayano run --help
+Run and follow the log file(s)
+
+Usage:
+  ayano run [filename...] [flags]
+
+Flags:
+  -a, --absolute          Show absolute time for each item
+  -g, --group             Try to group CIDRs
+  -h, --help              help for run
+      --no-netstat        Do not detect active connections
+  -o, --outlog string     Change log output file
+  -p, --parser string     Log parser (see "ayano list parsers") (default "nginx-json")
+      --prefixv4 int      Group IPv4 by prefix (default 24)
+      --prefixv6 int      Group IPv6 by prefix (default 48)
+  -r, --refresh int       Refresh interval in seconds (default 5)
+  -s, --server string     Server IP to filter (nginx-json only)
+  -S, --sort-by string    Sort result by (size|requests) (default "size")
+  -t, --threshold size    Threshold size for request (only requests at least this large will be counted) (default 10 MB)
+  -n, --top int           Number of top items to show (default 10)
+      --truncate          Truncate long URLs from output
+      --truncate-to int   Truncate URLs to given length, overrides --truncate
+  -w, --whole             Analyze whole log file and then tail it
 
 # Example 1
 $ ./ayano run -n 20 --threshold 50M /var/log/nginx/access_json.log
@@ -49,14 +62,7 @@ $ ./ayano run -n 50 --whole --parser nginx-combined /var/log/nginx/access.log
 $ ./ayano analyze -n 100 /var/log/nginx/access_json.log
 ```
 
-By default, it would output like this every 5 seconds:
-
-```log
-2024/07/10 00:13:48 2222:222:2222::/48 (active, 1): 457 MiB 2 228 MiB /some/big/file (from 6 seconds ago, last accessed 6 seconds ago)
-2024/07/10 00:13:48 111.11.111.0/24: 268 MiB 1 268 MiB /another/big/file (from 13 seconds ago, last accessed 13 seconds ago)
-```
-
-`457 MiB 2 228 MiB` means it downloads 457 MiB large files in total, with 2 requests and 228 MiB on average.
+Ayano would output a table which is easy for humans to read.
 
 ### Daemon mode (experimental)
 
@@ -88,7 +94,7 @@ which means that "114.5.14.0/24" takes at least 36GiB bandwidth, and "191.9.81.0
 
 ## Format support
 
-Ayano supports two types of nginx log:
+Ayano supports following types of log format. You could also use `ayano list parsers` to check.
 
 1. Standard "combined" format access log.
 2. JSON format access log configured as:
@@ -118,6 +124,7 @@ Ayano supports two types of nginx log:
     **Note**: If you are using Caddy behind a reverse proxy, please upgrade Caddy to 2.7.0+ and set `trusted_proxies` (and `client_ip_headers`) in configuration file to let log have `client_ip` field outputted.
 
 4. GoAccess format string. You shall set `GOACCESS_CONFIG` env to a goaccess config file beforehand ([format recognized](https://github.com/taoky/goaccessfmt?tab=readme-ov-file#config-file-format), [example](assets/goaccess.conf)).
+5. Tencent CDN log format.
 
 ## Note
 
