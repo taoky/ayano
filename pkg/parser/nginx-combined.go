@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-	"time"
 )
 
 func init() {
@@ -37,75 +36,24 @@ func init() {
 	})
 }
 
-const CommonLogFormat = "02/Jan/2006:15:04:05 -0700"
-
-func clfDateParse(s []byte) time.Time {
-	return clfDateParseString(string(s))
-}
-
-func clfDateParseString(s string) time.Time {
-	t, _ := time.Parse(CommonLogFormat, s)
-	return t
-}
-
-// Nginx escapes `"`, `\` to `\xXX`
-// Apache esacpes `"`, `\` to `\"` `\\`
-func findEndingDoubleQuote(data []byte) int {
-	inEscape := false
-	for i := 0; i < len(data); i++ {
-		if inEscape {
-			inEscape = false
-		} else {
-			if data[i] == '\\' {
-				inEscape = true
-			} else if data[i] == '"' {
-				return i
-			}
-		}
+func ParseNginxCombined(line []byte) (logItem LogItem, err error) {
+	fields, err := splitFields(line)
+	if err != nil {
+		return logItem, err
 	}
-	return -1
-}
-
-func ParseNginxCombined(line []byte) (LogItem, error) {
-	baseIdx := 0
-	// get the first -
-	delimIndex := bytes.IndexByte(line, '-')
-	if delimIndex == -1 {
-		return LogItem{}, errors.New("unexpected format: no - (empty identity)")
+	if len(fields) != 9 {
+		return logItem, fmt.Errorf("invalid format: expected 9 fields, got %d", len(fields))
 	}
 
-	clientIP := line[:delimIndex-1]
-	baseIdx = delimIndex + 1
-	// get time within [$time_local]
-	leftBracketIndex := bytes.IndexByte(line[baseIdx:], '[')
-	if leftBracketIndex == -1 {
-		return LogItem{}, errors.New("unexpected format: no [ (datetime)")
-	}
-	rightBracketIndex := bytes.IndexByte(line[baseIdx+leftBracketIndex+1:], ']')
-	if rightBracketIndex == -1 {
-		return LogItem{}, errors.New("unexpected format: no ] (datetime)")
+	if string(fields[1]) != "-" {
+		return logItem, errors.New("unexpected format: no - (empty identity)")
 	}
 
-	localTimeByte := line[baseIdx+leftBracketIndex+1 : baseIdx+leftBracketIndex+rightBracketIndex+1]
-	// localTime, err := time.Parse("02/Jan/2006:15:04:05 -0700", string(localTimeByte))
-	// if err != nil {
-	// 	return LogItem{}, err
-	// }
-	localTime := clfDateParse(localTimeByte)
-	baseIdx += leftBracketIndex + rightBracketIndex + 2
+	logItem.Client = string(fields[0])
+	logItem.Time = clfDateParse(fields[3])
 
-	// get URL within first "$request"
-	leftQuoteIndex := bytes.IndexByte(line[baseIdx:], '"')
-	if leftQuoteIndex == -1 {
-		return LogItem{}, errors.New("unexpected format: no \" (request)")
-	}
-	rightQuoteIndex := findEndingDoubleQuote(line[baseIdx+leftQuoteIndex+1:])
-	if rightQuoteIndex == -1 {
-		return LogItem{}, errors.New("unexpected format: no \" after first \" (request)")
-	}
-
-	url := line[baseIdx+leftQuoteIndex+1 : baseIdx+leftQuoteIndex+rightQuoteIndex+1]
-	baseIdx += leftQuoteIndex + rightQuoteIndex + 2
+	requestLine := fields[4]
+	url := requestLine
 	// strip HTTP method in url
 	spaceIndex := bytes.IndexByte(url, ' ')
 	if spaceIndex == -1 {
@@ -121,51 +69,16 @@ func ParseNginxCombined(line []byte) (LogItem, error) {
 	} else {
 		url = url[:spaceIndex]
 	}
+	logItem.URL = string(url)
 
-	// get size ($body_bytes_sent)
-	baseIdx += 1
-	leftSpaceIndex := bytes.IndexByte(line[baseIdx:], ' ')
-	if leftSpaceIndex == -1 {
-		return LogItem{}, errors.New("unexpected format: no space after $request (code)")
-	}
-	rightSpaceIndex := bytes.IndexByte(line[baseIdx+leftSpaceIndex+1:], ' ')
-	if rightSpaceIndex == -1 {
-		return LogItem{}, errors.New("unexpected format: no space after $body_bytes_sent (size)")
-	}
-	sizeBytes := line[baseIdx+leftSpaceIndex+1 : baseIdx+leftSpaceIndex+rightSpaceIndex+1]
-	size, err := strconv.ParseUint(string(sizeBytes), 10, 64)
+	sizeBytes := fields[6]
+	logItem.Size, err = strconv.ParseUint(string(sizeBytes), 10, 64)
 	if err != nil {
-		return LogItem{}, err
+		return logItem, err
 	}
-	baseIdx += leftSpaceIndex + rightSpaceIndex + 2
 
-	// skip referer
-	leftQuoteIndex = bytes.IndexByte(line[baseIdx:], '"')
-	if leftQuoteIndex == -1 {
-		return LogItem{}, errors.New("unexpected format: no \" (referer)")
-	}
-	rightQuoteIndex = findEndingDoubleQuote(line[baseIdx+leftQuoteIndex+1:])
-	if rightQuoteIndex == -1 {
-		return LogItem{}, errors.New("unexpected format: no \" after first \" (referer)")
-	}
-	baseIdx += 1 + leftQuoteIndex + rightQuoteIndex + 2
-	// get UA
-	leftQuoteIndex = bytes.IndexByte(line[baseIdx:], '"')
-	if leftQuoteIndex == -1 {
-		return LogItem{}, errors.New("unexpected format: no \" (user-agent)")
-	}
-	rightQuoteIndex = findEndingDoubleQuote(line[baseIdx+leftQuoteIndex+1:])
-	if rightQuoteIndex == -1 {
-		return LogItem{}, errors.New("unexpected format: no \" after first \" (user-agent)")
-	}
-	userAgent := line[baseIdx+leftQuoteIndex+1 : baseIdx+leftQuoteIndex+rightQuoteIndex+1]
-	return LogItem{
-		Size:      size,
-		Client:    string(clientIP),
-		Time:      localTime,
-		URL:       string(url),
-		Useragent: string(userAgent),
-	}, nil
+	logItem.Useragent = string(fields[8])
+	return
 }
 
 var nginxCombinedRe = regexp.MustCompile(
