@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-	"time"
 )
 
 func init() {
@@ -35,35 +34,6 @@ func init() {
 		Hidden:      true,
 		F:           newFuncRegex,
 	})
-}
-
-const CommonLogFormat = "02/Jan/2006:15:04:05 -0700"
-
-func clfDateParse(s []byte) time.Time {
-	return clfDateParseString(string(s))
-}
-
-func clfDateParseString(s string) time.Time {
-	t, _ := time.Parse(CommonLogFormat, s)
-	return t
-}
-
-// Nginx escapes `"`, `\` to `\xXX`
-// Apache esacpes `"`, `\` to `\"` `\\`
-func findEndingDoubleQuote(data []byte) int {
-	inEscape := false
-	for i := 0; i < len(data); i++ {
-		if inEscape {
-			inEscape = false
-		} else {
-			if data[i] == '\\' {
-				inEscape = true
-			} else if data[i] == '"' {
-				return i
-			}
-		}
-	}
-	return -1
 }
 
 func ParseNginxCombined(line []byte) (LogItem, error) {

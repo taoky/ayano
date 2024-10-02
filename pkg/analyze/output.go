@@ -1,7 +1,6 @@
 package analyze
 
 import (
-	"bytes"
 	"io"
 	"net/netip"
 	"slices"
@@ -22,19 +21,18 @@ type OutputContext struct {
 	DisplayRecord map[netip.Prefix]time.Time
 }
 
-type OutputFormatter interface {
+type Outputter interface {
 	Print(w io.Writer, ctx *OutputContext) error
 }
 
-type OutputFormatterFunc func(w io.Writer, ctx *OutputContext) error
+type OutputterFunc func(w io.Writer, ctx *OutputContext) error
 
-func (f OutputFormatterFunc) Print(w io.Writer, ctx *OutputContext) error {
+func (f OutputterFunc) Print(w io.Writer, ctx *OutputContext) error {
 	return f(w, ctx)
 }
 
 func PrintTable(w io.Writer, ctx *OutputContext) error {
-	tableBuf := new(bytes.Buffer)
-	table := tablewriter.NewWriter(tableBuf)
+	table := tablewriter.NewWriter(w)
 	table.SetCenterSeparator("  ")
 	table.SetColumnSeparator("")
 	table.SetRowSeparator("")
@@ -121,6 +119,5 @@ func PrintTable(w io.Writer, ctx *OutputContext) error {
 		table.Rich(row, rowColors)
 	}
 	table.Render()
-	w.Write(tableBuf.Bytes())
 	return nil
 }

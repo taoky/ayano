@@ -1,8 +1,6 @@
 package parser
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -32,32 +30,6 @@ func compactDateTimeParse(s []byte) time.Time {
 func compactDateTimeParseString(s string) time.Time {
 	t, _ := time.ParseInLocation(compactDateTime, s, time.Local)
 	return t
-}
-
-func splitFields(line []byte) ([][]byte, error) {
-	res := make([][]byte, 0, 16)
-	for baseIdx := 0; baseIdx < len(line); {
-		if line[baseIdx] == '"' {
-			quoteIdx := findEndingDoubleQuote(line[baseIdx+1:])
-			if quoteIdx == -1 {
-				return res, errors.New("unexpected format: unbalanced quotes")
-			}
-			res = append(res, line[baseIdx+1:baseIdx+quoteIdx+1])
-			baseIdx += quoteIdx + 2
-			if line[baseIdx] == ' ' {
-				baseIdx++
-			}
-		} else {
-			spaceIdx := bytes.IndexByte(line[baseIdx:], ' ')
-			if spaceIdx == -1 {
-				res = append(res, line[baseIdx:])
-				break
-			}
-			res = append(res, line[baseIdx:baseIdx+spaceIdx])
-			baseIdx += spaceIdx + 1
-		}
-	}
-	return res, nil
 }
 
 func ParseTencentCDN(line []byte) (logItem LogItem, err error) {
