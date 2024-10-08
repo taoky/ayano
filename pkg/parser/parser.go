@@ -12,6 +12,9 @@ type LogItem struct {
 	URL       string
 	Server    string
 	Useragent string
+
+	// Parsers wishing to discard this log item can set Discard to true.
+	Discard bool
 }
 
 type Parser interface {
