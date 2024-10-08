@@ -51,7 +51,7 @@ func ParseCaddyJSON(line []byte) (LogItem, error) {
 		return LogItem{}, err
 	}
 	if logItem.Msg != "handled request" {
-		return LogItem{}, ErrExpectedIgnoredLog
+		return LogItem{Discard: true}, nil
 	}
 	sec, dec := math.Modf(logItem.Timestamp)
 	t := time.Unix(int64(sec), int64(dec*1e9))

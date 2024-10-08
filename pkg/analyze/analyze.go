@@ -296,6 +296,10 @@ func (a *Analyzer) handleLine(line []byte) error {
 }
 
 func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
+	if logItem.Discard {
+		return nil
+	}
+
 	// Filter by server
 	if a.Config.Server != "" && logItem.Server != a.Config.Server {
 		return nil
