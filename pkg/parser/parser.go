@@ -37,8 +37,6 @@ type ParserMeta struct {
 }
 
 var (
-	ErrExpectedIgnoredLog = errors.New("ignored")
-
 	registry = make(map[string]ParserMeta)
 )
 
