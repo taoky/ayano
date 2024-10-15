@@ -360,11 +360,18 @@ func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
 	return nil
 }
 
+func filterSockTabEntry(s *netstat.SockTabEntry) bool {
+	switch s.LocalAddr.Port {
+	case 80, 443, 873:
+	default:
+		return false
+	}
+	return s.State == netstat.Established
+}
+
 func (a *Analyzer) GetActiveConns(activeConn map[netip.Prefix]int) {
 	// Get active connections
-	tabs, err := netstat.TCPSocks(func(s *netstat.SockTabEntry) bool {
-		return s.State == netstat.Established
-	})
+	tabs, err := netstat.TCPSocks(filterSockTabEntry)
 	if err != nil {
 		a.logger.Printf("netstat error: %v", err)
 	} else {
@@ -376,9 +383,7 @@ func (a *Analyzer) GetActiveConns(activeConn map[netip.Prefix]int) {
 			activeConn[a.IPPrefix(ip)] += 1
 		}
 	}
-	tabs, err = netstat.TCP6Socks(func(s *netstat.SockTabEntry) bool {
-		return s.State == netstat.Established
-	})
+	tabs, err = netstat.TCP6Socks(filterSockTabEntry)
 	if err != nil {
 		a.logger.Printf("netstat error: %v", err)
 	} else {
