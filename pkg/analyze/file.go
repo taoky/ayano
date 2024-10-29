@@ -1,17 +1,30 @@
 package analyze
 
 import (
+	"errors"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 
 	"github.com/nxadm/tail"
 	"github.com/taoky/ayano/pkg/fileiter"
 )
 
 const oneMiB = 1024 * 1024
+
+type filteredReader struct {
+	cmd *exec.Cmd
+	r   io.ReadCloser
+}
+
+func (fr *filteredReader) Read(p []byte) (n int, err error) {
+	return fr.r.Read(p)
+}
+
+func (fr *filteredReader) Close() error {
+	return errors.Join(fr.cmd.Wait(), fr.r.Close())
+}
 
 func filterByCommand(r io.Reader, args []string) (io.ReadCloser, error) {
 	cmd := exec.Command(args[0], args[1:]...)
@@ -23,30 +36,24 @@ func filterByCommand(r io.Reader, args []string) (io.ReadCloser, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
-	runtime.SetFinalizer(stdout, func(_ io.ReadCloser) {
-		cmd.Wait()
-		if closer, ok := r.(io.Closer); ok {
-			closer.Close()
-		}
-	})
-	return stdout, err
+	return &filteredReader{cmd: cmd, r: stdout}, nil
 }
 
-type filterFunc func(r io.Reader) (io.Reader, error)
+type filterFunc func(r io.ReadCloser) (io.ReadCloser, error)
 
 var fileTypes = map[string]filterFunc{
-	".gz": func(r io.Reader) (io.Reader, error) {
+	".gz": func(r io.ReadCloser) (io.ReadCloser, error) {
 		return filterByCommand(r, []string{"gzip", "-cd"})
 	},
-	".xz": func(r io.Reader) (io.Reader, error) {
+	".xz": func(r io.ReadCloser) (io.ReadCloser, error) {
 		return filterByCommand(r, []string{"xz", "-cd", "-T", "0"})
 	},
-	".zst": func(r io.Reader) (io.Reader, error) {
+	".zst": func(r io.ReadCloser) (io.ReadCloser, error) {
 		return filterByCommand(r, []string{"zstd", "-cd", "-T0"})
 	},
 }
 
-func OpenFile(filename string) (io.Reader, error) {
+func OpenFile(filename string) (io.ReadCloser, error) {
 	f, err := os.Open(filename)
 	if err != nil {
 		return nil, err
