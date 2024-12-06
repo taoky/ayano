@@ -23,6 +23,7 @@ func TestAdjacentPrefix(t *testing.T) {
 func TestTruncateURLPath(t *testing.T) {
 	testCases := [][2]string{
 		{"/example/a/b/c/d/e/file.ext", "/example/.../file.ext"},
+		{"///example//merge/slashes///file.ext", "/example/.../file.ext"},
 		{"/example/a/b/c/d/e/dir/", "/example/.../dir/"},
 		{"/short/", "/short/"},
 		{"/short/file.ext", "/short/file.ext"},
@@ -43,12 +44,14 @@ func TestTruncateURLPathLen(t *testing.T) {
 	testCases := []testCase{
 		{"/example/a/b/c/d/e/file.ext", 30, "/example/.../file.ext"},
 		{"/example/a/b/c/d/e/dir/", 30, "/example/.../dir/"},
+		{"///example//merge/slashes///dir/", 30, "/example/.../dir/"},
 		{"/with/args/?a=1&b=2", 30, "/with/args/?..."},
 		{"/with/args/?a=1&b=2", 13, "/with/args/?"},
 		{"/with/args/?a=1&b=2", 12, "/with/args/?"},
 		{"/with/args/?a=1&b=2", 11, "/with/args/"},
 		{"/with/args/?a=1&b=2", 8, "/with/*/"},
 		{"/with/args/?a=1&b=2", 4, "/wit"},
+		{"///with//args/?a=1&b=2", 4, "/wit"},
 
 		{"/example/a/b/c/d/e/file.with.long.name.ext", 30, "/example/.../file.with.l...ext"},
 		{"/example/file.with.very.long.name.ext", 30, "/example/file.with.very....ext"},
