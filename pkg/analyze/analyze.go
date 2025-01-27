@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"unique"
 
 	"github.com/cakturk/go-netstat/netstat"
 	"github.com/dustin/go-humanize"
@@ -27,6 +28,8 @@ var (
 	tableColorNone = tablewriter.Colors{tablewriter.Normal}
 	tableColorBold = tablewriter.Colors{tablewriter.Bold}
 )
+
+type UAKeyType = unique.Handle[string]
 
 type IPStats struct {
 	Size     uint64
@@ -44,7 +47,7 @@ type IPStats struct {
 	LastURLAccess time.Time
 
 	// User-agent
-	UAStore map[string]struct{}
+	UAStore map[UAKeyType]struct{}
 }
 
 func (i IPStats) UpdateWith(item parser.LogItem) IPStats {
@@ -62,13 +65,9 @@ func (i IPStats) UpdateWith(item parser.LogItem) IPStats {
 		}
 	}
 	if i.UAStore == nil {
-		i.UAStore = make(map[string]struct{})
+		i.UAStore = make(map[UAKeyType]struct{})
 	}
-	if len(item.Useragent) <= 50 {
-		i.UAStore[item.Useragent] = struct{}{}
-	} else {
-		i.UAStore[item.Useragent[:50]] = struct{}{}
-	}
+	i.UAStore[unique.Make(item.Useragent)] = struct{}{}
 	return i
 }
 
