@@ -17,6 +17,7 @@ import (
 	"github.com/cakturk/go-netstat/netstat"
 	"github.com/dustin/go-humanize"
 	"github.com/olekukonko/tablewriter"
+	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/pflag"
 	"github.com/taoky/ayano/pkg/fileiter"
 	"github.com/taoky/ayano/pkg/parser"
@@ -106,6 +107,7 @@ type Analyzer struct {
 
 	logParser parser.Parser
 	logger    *log.Logger
+	bar       *progressbar.ProgressBar
 }
 
 type AnalyzerConfig struct {
@@ -157,6 +159,7 @@ func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet, cmdname string) {
 		flags.Var(&c.PrintDelta, "print-delta", "Size interval for printing lines")
 	}
 }
+
 func (c *AnalyzerConfig) UseLock() bool {
 	return !c.Analyze && !c.Daemon
 }
@@ -202,10 +205,13 @@ func NewAnalyzer(c AnalyzerConfig) (*Analyzer, error) {
 		stats:     make(map[StatKey]IPStats),
 		logParser: logParser,
 		logger:    logger,
+		bar:       progressbar.Default(-1, "analyzing"),
 	}, nil
 }
 
 func (a *Analyzer) RunLoop(iter fileiter.Iterator) error {
+	a.bar.Reset()
+	defer a.bar.Finish()
 	for {
 		line, err := iter.Next()
 		if err != nil {
@@ -223,6 +229,9 @@ func (a *Analyzer) RunLoop(iter fileiter.Iterator) error {
 }
 
 func (a *Analyzer) RunLoopWithMultipleIterators(iters []fileiter.Iterator) error {
+	a.bar.Reset()
+	defer a.bar.Finish()
+
 	var wg sync.WaitGroup
 	linesChan := make(chan []byte, 2*len(iters))
 
@@ -287,6 +296,7 @@ func (a *Analyzer) TailFile(filename string) error {
 }
 
 func (a *Analyzer) handleLine(line []byte) error {
+	a.bar.Add64(1)
 	logItem, err := a.logParser.Parse(line)
 	if err != nil {
 		return fmt.Errorf("parse error: %w\ngot line: %q", err, line)
