@@ -35,7 +35,7 @@ type UAKeyType = unique.Handle[string]
 type DirectoryTotalStats struct {
     Size     uint64
     Requests uint64
-    LastURL  string
+    IPCount  map[netip.Prefix]struct{} // 新增 IP 统计
     LastURLUpdate time.Time
     LastURLAccess time.Time
 }
@@ -408,20 +408,25 @@ func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
     if stats, ok := a.dirStats[dir]; ok {
         stats.Size += logItem.Size
         stats.Requests++
+		if stats.IPCount == nil {
+			stats.IPCount = make(map[netip.Prefix]struct{})
+		}
+		stats.IPCount[clientPrefix] = struct{}{}
         if logItem.Time.After(stats.LastURLAccess) {
-            stats.LastURL = logItem.URL
             stats.LastURLUpdate = logItem.Time
             stats.LastURLAccess = logItem.Time
         }
-    } else {
-        a.dirStats[dir] = &DirectoryTotalStats{
-            Size:          logItem.Size,
-            Requests:      1,
-            LastURL:       logItem.URL,
-            LastURLUpdate: logItem.Time,
-            LastURLAccess: logItem.Time,
-        }
-    }
+	} else {
+		ipCount := make(map[netip.Prefix]struct{})
+		ipCount[clientPrefix] = struct{}{}
+		a.dirStats[dir] = &DirectoryTotalStats{
+			Size:          logItem.Size,
+			Requests:      1,
+			IPCount:       ipCount,          // 使用已初始化的 ipCount
+			LastURLUpdate: logItem.Time,
+			LastURLAccess: logItem.Time,
+		}
+	}
 
 	return nil
 }
@@ -496,9 +501,19 @@ func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy S
     }
 
     // 按流量大小排序
-    slices.SortFunc(dirs, func(a, b dirEntry) int {
-        return int(b.stats.Size - a.stats.Size)
-    })
+    // slices.SortFunc(dirs, func(a, b dirEntry) int {
+    //     return int(b.stats.Size - a.stats.Size)
+    // })
+
+	if sortBy == SortBySize {
+		slices.SortFunc(dirs, func(a, b dirEntry) int {
+			return int(b.stats.Size - a.stats.Size)
+		})
+	} else if sortBy == SortByRequests {
+		slices.SortFunc(dirs, func(a, b dirEntry) int {
+			return int(b.stats.Requests - a.stats.Requests)
+		})
+	} 
 
     // 创建表格
     tableBuf := new(bytes.Buffer)
@@ -515,14 +530,14 @@ func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy S
     table.SetNoWhiteSpace(true)
 
     // 设置表头
-    table.SetHeader([]string{"Directory", "Size", "Requests", "Avg Size", "Last URL", "Last Access"})
+    table.SetHeader([]string{"Directory", "Size", "Requests", "Avg Size", "IPs", "Last Access"})
     table.SetColumnAlignment([]int{
-        tablewriter.ALIGN_LEFT,
-        tablewriter.ALIGN_RIGHT,
-        tablewriter.ALIGN_RIGHT,
-        tablewriter.ALIGN_RIGHT,
-        tablewriter.ALIGN_LEFT,
-        tablewriter.ALIGN_RIGHT,
+        tablewriter.ALIGN_LEFT,   // Directory
+        tablewriter.ALIGN_RIGHT,  // Size
+        tablewriter.ALIGN_RIGHT,  // Requests
+        tablewriter.ALIGN_RIGHT,  // Avg Size
+        tablewriter.ALIGN_RIGHT,  // IPs
+        tablewriter.ALIGN_RIGHT,  // Last Access
     })
 
     // 取前N个目录显示
@@ -537,13 +552,6 @@ func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy S
         stats := dir.stats
         avgSize := stats.Size / uint64(stats.Requests)
         
-        last := stats.LastURL
-        if a.Config.Truncate2 > 0 {
-            last = TruncateURLPathLen(last, a.Config.Truncate2)
-        } else if a.Config.Truncate {
-            last = TruncateURLPath(last)
-        }
-
         lastAccess := humanize.Time(stats.LastURLAccess)
         if a.Config.Absolute {
             lastAccess = stats.LastURLAccess.Format(TimeFormat)
@@ -554,7 +562,7 @@ func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy S
             humanize.IBytes(stats.Size),
             strconv.FormatUint(stats.Requests, 10),
             humanize.IBytes(avgSize),
-            last,
+            strconv.Itoa(len(stats.IPCount)),  // 显示不同 IP 数量
             lastAccess,
         }
         
