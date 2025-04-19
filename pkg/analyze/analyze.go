@@ -32,10 +32,26 @@ var (
 
 type UAKeyType = unique.Handle[string]
 
+type DirectoryTotalStats struct {
+    Size     uint64
+    Requests uint64
+    LastURL  string
+    LastURLUpdate time.Time
+    LastURLAccess time.Time
+}
+
+type DirectoryStats struct {
+    Size     uint64
+    Requests uint64
+}
+
 type IPStats struct {
 	Size     uint64
 	Requests uint64
 	LastURL  string
+
+    // 按目录统计
+    DirStats map[string]*DirectoryStats
 
 	// Used with daemon mode only
 	LastSize  uint64
@@ -54,6 +70,22 @@ type IPStats struct {
 func (i IPStats) UpdateWith(item parser.LogItem) IPStats {
 	i.Size += item.Size
 	i.Requests += 1
+
+	// 更新目录统计
+	if i.DirStats == nil {
+		i.DirStats = make(map[string]*DirectoryStats)
+	}
+	dir := GetFirstDirectory(item.URL)
+	if stats, ok := i.DirStats[dir]; ok {
+		stats.Size += item.Size
+		stats.Requests++
+	} else {
+		i.DirStats[dir] = &DirectoryStats{
+			Size:     item.Size,
+			Requests: 1,
+		}
+	}
+
 	if item.URL != i.LastURL {
 		if i.LastURLUpdate.Before(item.Time) {
 			i.LastURL = item.URL
@@ -103,6 +135,7 @@ type Analyzer struct {
 
 	// [server, ip prefix] -> IPStats
 	stats map[StatKey]IPStats
+	dirStats map[string]*DirectoryTotalStats  // 新增目录统计
 	mu    sync.Mutex
 
 	logParser parser.Parser
@@ -366,6 +399,29 @@ func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
 		a.stats[StatKey{a.Config.Server, clientPrefix}] = ipStats
 	}
 
+	if a.dirStats == nil {
+        a.dirStats = make(map[string]*DirectoryTotalStats)
+    }
+
+    dir := GetFirstDirectory(logItem.URL)
+    if stats, ok := a.dirStats[dir]; ok {
+        stats.Size += logItem.Size
+        stats.Requests++
+        if logItem.Time.After(stats.LastURLAccess) {
+            stats.LastURL = logItem.URL
+            stats.LastURLUpdate = logItem.Time
+            stats.LastURLAccess = logItem.Time
+        }
+    } else {
+        a.dirStats[dir] = &DirectoryTotalStats{
+            Size:          logItem.Size,
+            Requests:      1,
+            LastURL:       logItem.URL,
+            LastURLUpdate: logItem.Time,
+            LastURLAccess: logItem.Time,
+        }
+    }
+
 	return nil
 }
 
@@ -421,159 +477,245 @@ func (a *Analyzer) SortedKeys(sortBy SortByFlag, serverFilter string) []StatKey 
 	}
 	return keys
 }
-
 func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag, serverFilter string) {
-	activeConn := make(map[netip.Prefix]int)
-	if !a.Config.NoNetstat {
-		a.GetActiveConns(activeConn)
-	}
+    if a.Config.UseLock() {
+        a.mu.Lock()
+        defer a.mu.Unlock()
+    }
 
-	if a.Config.UseLock() {
-		a.mu.Lock()
-		defer a.mu.Unlock()
-	}
+    // 将目录统计转换为切片以便排序
+    type dirEntry struct {
+        dir   string
+        stats *DirectoryTotalStats
+    }
+    
+    dirs := make([]dirEntry, 0, len(a.dirStats))
+    for dir, stats := range a.dirStats {
+        dirs = append(dirs, dirEntry{dir, stats})
+    }
 
-	keys := a.SortedKeys(sortBy, serverFilter)
+    // 按流量大小排序
+    slices.SortFunc(dirs, func(a, b dirEntry) int {
+        return int(b.stats.Size - a.stats.Size)
+    })
 
-	// print top N
-	top := a.Config.TopN
-	if len(keys) < a.Config.TopN {
-		top = len(keys)
-	} else if a.Config.TopN == 0 {
-		// no limit
-		top = len(keys)
-	}
+    // 创建表格
+    tableBuf := new(bytes.Buffer)
+    table := tablewriter.NewWriter(tableBuf)
+    table.SetCenterSeparator("  ")
+    table.SetColumnSeparator("")
+    table.SetRowSeparator("")
+    table.SetTablePadding("  ")
+    table.SetAutoFormatHeaders(false)
+    table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+    table.SetAlignment(tablewriter.ALIGN_LEFT)
+    table.SetHeaderLine(false)
+    table.SetBorder(false)
+    table.SetNoWhiteSpace(true)
 
-	if a.Config.Group {
-		groupedKeys := make(map[StatKey]struct{})
-		for _, key := range keys {
-			if key.Prefix.Bits() == 0 {
-				continue
-			}
-			adjacentKey := StatKey{key.Server, AdjacentPrefix(key.Prefix)}
-			_, ok := groupedKeys[adjacentKey]
-			if !ok {
-				// would insert into groupedKeys
-				if len(groupedKeys) >= top {
-					break
-				}
-				groupedKeys[key] = struct{}{}
-			}
-			for ok {
-				newStat := a.stats[key].MergeWith(a.stats[adjacentKey])
-				mergedPrefix := netip.PrefixFrom(key.Prefix.Addr(), key.Prefix.Bits()-1).Masked()
-				newKey := StatKey{key.Server, mergedPrefix}
+    // 设置表头
+    table.SetHeader([]string{"Directory", "Size", "Requests", "Avg Size", "Last URL", "Last Access"})
+    table.SetColumnAlignment([]int{
+        tablewriter.ALIGN_LEFT,
+        tablewriter.ALIGN_RIGHT,
+        tablewriter.ALIGN_RIGHT,
+        tablewriter.ALIGN_RIGHT,
+        tablewriter.ALIGN_LEFT,
+        tablewriter.ALIGN_RIGHT,
+    })
 
-				a.stats[newKey] = newStat
-				delete(a.stats, key)
-				delete(a.stats, adjacentKey)
+    // 取前N个目录显示
+    top := a.Config.TopN
+    if len(dirs) < top || top == 0 {
+        top = len(dirs)
+    }
 
-				groupedKeys[newKey] = struct{}{}
-				delete(groupedKeys, key)
-				delete(groupedKeys, adjacentKey)
+    // 添加行数据
+    for i := 0; i < top; i++ {
+        dir := dirs[i]
+        stats := dir.stats
+        avgSize := stats.Size / uint64(stats.Requests)
+        
+        last := stats.LastURL
+        if a.Config.Truncate2 > 0 {
+            last = TruncateURLPathLen(last, a.Config.Truncate2)
+        } else if a.Config.Truncate {
+            last = TruncateURLPath(last)
+        }
 
-				if newKey.Prefix.Bits() == 0 {
-					break
-				}
-				key = newKey
-				adjacentKey = StatKey{key.Server, AdjacentPrefix(key.Prefix)}
-				_, ok = groupedKeys[adjacentKey]
-			}
-		}
-		keys = a.SortedKeys(sortBy, serverFilter)
-		if len(keys) < top {
-			top = len(keys)
-		}
-	}
+        lastAccess := humanize.Time(stats.LastURLAccess)
+        if a.Config.Absolute {
+            lastAccess = stats.LastURLAccess.Format(TimeFormat)
+        }
 
-	tableBuf := new(bytes.Buffer)
-	table := tablewriter.NewWriter(tableBuf)
-	table.SetCenterSeparator("  ")
-	table.SetColumnSeparator("")
-	table.SetRowSeparator("")
-	table.SetTablePadding("  ")
-	table.SetAutoFormatHeaders(false)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetNoWhiteSpace(true)
-	tAlignment := []int{
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_DEFAULT,
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_RIGHT,
-	}
-	tHeaders := []string{"CIDR", "Conn", "Bytes", "Reqs", "Avg", "URL", "URL Since", "URL Last", "UA"}
-	if a.Config.NoNetstat {
-		tAlignment = append(tAlignment[:1], tAlignment[2:]...)
-		tHeaders = append(tHeaders[:1], tHeaders[2:]...)
-	}
-	table.SetColumnAlignment(tAlignment)
-	table.SetHeader(tHeaders)
+        row := []string{
+            dir.dir,
+            humanize.IBytes(stats.Size),
+            strconv.FormatUint(stats.Requests, 10),
+            humanize.IBytes(avgSize),
+            last,
+            lastAccess,
+        }
+        
+        table.Append(row)
+    }
 
-	for i := range top {
-		key := keys[i]
-		ipStats := a.stats[key]
-		total := ipStats.Size
-		reqTotal := ipStats.Requests
-		last := ipStats.LastURL
-		agents := len(ipStats.UAStore)
-		if a.Config.Truncate2 > 0 {
-			last = TruncateURLPathLen(last, a.Config.Truncate2)
-		} else if a.Config.Truncate {
-			last = TruncateURLPath(last)
-		}
-
-		var lastUpdateTime, lastAccessTime string
-		if a.Config.Absolute {
-			lastUpdateTime = ipStats.LastURLUpdate.Format(TimeFormat)
-			lastAccessTime = ipStats.LastURLAccess.Format(TimeFormat)
-		} else {
-			lastUpdateTime = humanize.Time(ipStats.LastURLUpdate)
-			lastAccessTime = humanize.Time(ipStats.LastURLAccess)
-		}
-
-		average := total / uint64(reqTotal)
-		boldLine := false
-		if displayRecord != nil && displayRecord[key.Prefix] != ipStats.LastURLAccess {
-			// display this line in bold
-			boldLine = true
-			displayRecord[key.Prefix] = ipStats.LastURLAccess
-		}
-
-		row := []string{
-			key.Prefix.String(), "", humanize.IBytes(total), strconv.FormatUint(reqTotal, 10),
-			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime, strconv.Itoa(agents),
-		}
-		rowColors := slices.Repeat([]tablewriter.Colors{tableColorNone}, len(row))
-		if boldLine {
-			rowColors = slices.Repeat([]tablewriter.Colors{tableColorBold}, len(row))
-		} else {
-			// Bold color for 2nd column (connections)
-			rowColors[1] = tableColorBold
-		}
-
-		if !a.Config.NoNetstat {
-			if _, ok := activeConn[key.Prefix]; ok {
-				row[1] = strconv.Itoa(activeConn[key.Prefix])
-			}
-		} else {
-			// Remove connections column
-			row = append(row[:1], row[2:]...)
-			rowColors = append(rowColors[:1], rowColors[2:]...)
-		}
-
-		table.Rich(row, rowColors)
-	}
-	table.Render()
-	a.logger.Writer().Write(tableBuf.Bytes())
+    table.Render()
+    a.logger.Writer().Write(tableBuf.Bytes())
 }
+
+// func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag, serverFilter string) {
+// 	activeConn := make(map[netip.Prefix]int)
+// 	if !a.Config.NoNetstat {
+// 		a.GetActiveConns(activeConn)
+// 	}
+
+// 	if a.Config.UseLock() {
+// 		a.mu.Lock()
+// 		defer a.mu.Unlock()
+// 	}
+
+// 	keys := a.SortedKeys(sortBy, serverFilter)
+
+// 	// print top N
+// 	top := a.Config.TopN
+// 	if len(keys) < a.Config.TopN {
+// 		top = len(keys)
+// 	} else if a.Config.TopN == 0 {
+// 		// no limit
+// 		top = len(keys)
+// 	}
+
+// 	if a.Config.Group {
+// 		groupedKeys := make(map[StatKey]struct{})
+// 		for _, key := range keys {
+// 			if key.Prefix.Bits() == 0 {
+// 				continue
+// 			}
+// 			adjacentKey := StatKey{key.Server, AdjacentPrefix(key.Prefix)}
+// 			_, ok := groupedKeys[adjacentKey]
+// 			if !ok {
+// 				// would insert into groupedKeys
+// 				if len(groupedKeys) >= top {
+// 					break
+// 				}
+// 				groupedKeys[key] = struct{}{}
+// 			}
+// 			for ok {
+// 				newStat := a.stats[key].MergeWith(a.stats[adjacentKey])
+// 				mergedPrefix := netip.PrefixFrom(key.Prefix.Addr(), key.Prefix.Bits()-1).Masked()
+// 				newKey := StatKey{key.Server, mergedPrefix}
+
+// 				a.stats[newKey] = newStat
+// 				delete(a.stats, key)
+// 				delete(a.stats, adjacentKey)
+
+// 				groupedKeys[newKey] = struct{}{}
+// 				delete(groupedKeys, key)
+// 				delete(groupedKeys, adjacentKey)
+
+// 				if newKey.Prefix.Bits() == 0 {
+// 					break
+// 				}
+// 				key = newKey
+// 				adjacentKey = StatKey{key.Server, AdjacentPrefix(key.Prefix)}
+// 				_, ok = groupedKeys[adjacentKey]
+// 			}
+// 		}
+// 		keys = a.SortedKeys(sortBy, serverFilter)
+// 		if len(keys) < top {
+// 			top = len(keys)
+// 		}
+// 	}
+
+// 	tableBuf := new(bytes.Buffer)
+// 	table := tablewriter.NewWriter(tableBuf)
+// 	table.SetCenterSeparator("  ")
+// 	table.SetColumnSeparator("")
+// 	table.SetRowSeparator("")
+// 	table.SetTablePadding("  ")
+// 	table.SetAutoFormatHeaders(false)
+// 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+// 	table.SetAlignment(tablewriter.ALIGN_LEFT)
+// 	table.SetHeaderLine(false)
+// 	table.SetBorder(false)
+// 	table.SetNoWhiteSpace(true)
+// 	tAlignment := []int{
+// 		tablewriter.ALIGN_RIGHT,
+// 		tablewriter.ALIGN_RIGHT,
+// 		tablewriter.ALIGN_RIGHT,
+// 		tablewriter.ALIGN_RIGHT,
+// 		tablewriter.ALIGN_RIGHT,
+// 		tablewriter.ALIGN_DEFAULT,
+// 		tablewriter.ALIGN_RIGHT,
+// 		tablewriter.ALIGN_RIGHT,
+// 		tablewriter.ALIGN_RIGHT,
+// 	}
+// 	tHeaders := []string{"CIDR", "Conn", "Bytes", "Reqs", "Avg", "URL", "URL Since", "URL Last", "UA"}
+// 	if a.Config.NoNetstat {
+// 		tAlignment = append(tAlignment[:1], tAlignment[2:]...)
+// 		tHeaders = append(tHeaders[:1], tHeaders[2:]...)
+// 	}
+// 	table.SetColumnAlignment(tAlignment)
+// 	table.SetHeader(tHeaders)
+
+// 	for i := range top {
+// 		key := keys[i]
+// 		ipStats := a.stats[key]
+// 		total := ipStats.Size
+// 		reqTotal := ipStats.Requests
+// 		last := ipStats.LastURL
+// 		agents := len(ipStats.UAStore)
+// 		if a.Config.Truncate2 > 0 {
+// 			last = TruncateURLPathLen(last, a.Config.Truncate2)
+// 		} else if a.Config.Truncate {
+// 			last = TruncateURLPath(last)
+// 		}
+
+// 		var lastUpdateTime, lastAccessTime string
+// 		if a.Config.Absolute {
+// 			lastUpdateTime = ipStats.LastURLUpdate.Format(TimeFormat)
+// 			lastAccessTime = ipStats.LastURLAccess.Format(TimeFormat)
+// 		} else {
+// 			lastUpdateTime = humanize.Time(ipStats.LastURLUpdate)
+// 			lastAccessTime = humanize.Time(ipStats.LastURLAccess)
+// 		}
+
+// 		average := total / uint64(reqTotal)
+// 		boldLine := false
+// 		if displayRecord != nil && displayRecord[key.Prefix] != ipStats.LastURLAccess {
+// 			// display this line in bold
+// 			boldLine = true
+// 			displayRecord[key.Prefix] = ipStats.LastURLAccess
+// 		}
+
+// 		row := []string{
+// 			key.Prefix.String(), "", humanize.IBytes(total), strconv.FormatUint(reqTotal, 10),
+// 			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime, strconv.Itoa(agents),
+// 		}
+// 		rowColors := slices.Repeat([]tablewriter.Colors{tableColorNone}, len(row))
+// 		if boldLine {
+// 			rowColors = slices.Repeat([]tablewriter.Colors{tableColorBold}, len(row))
+// 		} else {
+// 			// Bold color for 2nd column (connections)
+// 			rowColors[1] = tableColorBold
+// 		}
+
+// 		if !a.Config.NoNetstat {
+// 			if _, ok := activeConn[key.Prefix]; ok {
+// 				row[1] = strconv.Itoa(activeConn[key.Prefix])
+// 			}
+// 		} else {
+// 			// Remove connections column
+// 			row = append(row[:1], row[2:]...)
+// 			rowColors = append(rowColors[:1], rowColors[2:]...)
+// 		}
+
+// 		table.Rich(row, rowColors)
+// 	}
+// 	table.Render()
+// 	a.logger.Writer().Write(tableBuf.Bytes())
+// }
 
 func (a *Analyzer) GetCurrentServers() []string {
 	if a.Config.UseLock() {
