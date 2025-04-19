@@ -52,8 +52,18 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 			systemd.MustNotifyReady()
 		}
 	}()
-
-	if config.Analyze {
+	if config.DirAnalyze {
+		fmt.Println("DirAnalyze mode")
+		for _, filename := range filenames {
+			err = analyzer.AnalyzeFile(filename)
+			if err != nil {
+				break
+			}
+		}
+		analyzer.DirAnalyze(nil, config.SortBy, "")
+		return err
+	}else if config.Analyze {
+		fmt.Println("Analyze mode")
 		for _, filename := range filenames {
 			err = analyzer.AnalyzeFile(filename)
 			if err != nil {
@@ -155,6 +165,46 @@ func daemonCmd() *cobra.Command {
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		config.Daemon = true
 		return runWithConfig(cmd, args, config)
+	}
+	return cmd
+}
+func dirAnalyzeCmd() *cobra.Command {
+    cmd := &cobra.Command{
+        Use:   "dir-analyze [filename...]",
+        Short: "Analyze log by directory (show statistics for each first-level directory)",
+    }
+	config := analyze.DefaultConfig()
+	config.InstallFlags(cmd.Flags(), cmd.Name())
+
+	var cpuProf string
+	var memProf string
+	cmd.Flags().StringVar(&cpuProf, "cpuprof", "", "write CPU pprof data to file")
+	cmd.Flags().StringVar(&memProf, "memprof", "", "write memory pprof data to file")
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+        config.DirAnalyze = true
+		if cpuProf != "" {
+			f, err := os.Create(cpuProf)
+			if err != nil {
+				return fmt.Errorf("failed to create CPU pprof file: %w", err)
+			}
+			defer f.Close()
+			if err := pprof.StartCPUProfile(f); err != nil {
+				return fmt.Errorf("failed to start CPU pprof: %w", err)
+			}
+			defer pprof.StopCPUProfile()
+		}
+		err := runWithConfig(cmd, args, config)
+		if memProf != "" {
+			f, err := os.Create(memProf)
+			if err != nil {
+				return fmt.Errorf("failed to create memory pprof file: %w", err)
+			}
+			defer f.Close()
+			if err := pprof.WriteHeapProfile(f); err != nil {
+				return fmt.Errorf("failed to write memory pprof: %w", err)
+			}
+		}
+		return err
 	}
 	return cmd
 }

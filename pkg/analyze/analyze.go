@@ -163,6 +163,7 @@ type AnalyzerConfig struct {
 
 	Analyze bool
 	Daemon  bool
+	DirAnalyze bool  // 新增选项
 }
 
 func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet, cmdname string) {
@@ -477,7 +478,7 @@ func (a *Analyzer) SortedKeys(sortBy SortByFlag, serverFilter string) []StatKey 
 	}
 	return keys
 }
-func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag, serverFilter string) {
+func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag, serverFilter string) {
     if a.Config.UseLock() {
         a.mu.Lock()
         defer a.mu.Unlock()
@@ -564,158 +565,158 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
     a.logger.Writer().Write(tableBuf.Bytes())
 }
 
-// func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag, serverFilter string) {
-// 	activeConn := make(map[netip.Prefix]int)
-// 	if !a.Config.NoNetstat {
-// 		a.GetActiveConns(activeConn)
-// 	}
+func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag, serverFilter string) {
+	activeConn := make(map[netip.Prefix]int)
+	if !a.Config.NoNetstat {
+		a.GetActiveConns(activeConn)
+	}
 
-// 	if a.Config.UseLock() {
-// 		a.mu.Lock()
-// 		defer a.mu.Unlock()
-// 	}
+	if a.Config.UseLock() {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+	}
 
-// 	keys := a.SortedKeys(sortBy, serverFilter)
+	keys := a.SortedKeys(sortBy, serverFilter)
 
-// 	// print top N
-// 	top := a.Config.TopN
-// 	if len(keys) < a.Config.TopN {
-// 		top = len(keys)
-// 	} else if a.Config.TopN == 0 {
-// 		// no limit
-// 		top = len(keys)
-// 	}
+	// print top N
+	top := a.Config.TopN
+	if len(keys) < a.Config.TopN {
+		top = len(keys)
+	} else if a.Config.TopN == 0 {
+		// no limit
+		top = len(keys)
+	}
 
-// 	if a.Config.Group {
-// 		groupedKeys := make(map[StatKey]struct{})
-// 		for _, key := range keys {
-// 			if key.Prefix.Bits() == 0 {
-// 				continue
-// 			}
-// 			adjacentKey := StatKey{key.Server, AdjacentPrefix(key.Prefix)}
-// 			_, ok := groupedKeys[adjacentKey]
-// 			if !ok {
-// 				// would insert into groupedKeys
-// 				if len(groupedKeys) >= top {
-// 					break
-// 				}
-// 				groupedKeys[key] = struct{}{}
-// 			}
-// 			for ok {
-// 				newStat := a.stats[key].MergeWith(a.stats[adjacentKey])
-// 				mergedPrefix := netip.PrefixFrom(key.Prefix.Addr(), key.Prefix.Bits()-1).Masked()
-// 				newKey := StatKey{key.Server, mergedPrefix}
+	if a.Config.Group {
+		groupedKeys := make(map[StatKey]struct{})
+		for _, key := range keys {
+			if key.Prefix.Bits() == 0 {
+				continue
+			}
+			adjacentKey := StatKey{key.Server, AdjacentPrefix(key.Prefix)}
+			_, ok := groupedKeys[adjacentKey]
+			if !ok {
+				// would insert into groupedKeys
+				if len(groupedKeys) >= top {
+					break
+				}
+				groupedKeys[key] = struct{}{}
+			}
+			for ok {
+				newStat := a.stats[key].MergeWith(a.stats[adjacentKey])
+				mergedPrefix := netip.PrefixFrom(key.Prefix.Addr(), key.Prefix.Bits()-1).Masked()
+				newKey := StatKey{key.Server, mergedPrefix}
 
-// 				a.stats[newKey] = newStat
-// 				delete(a.stats, key)
-// 				delete(a.stats, adjacentKey)
+				a.stats[newKey] = newStat
+				delete(a.stats, key)
+				delete(a.stats, adjacentKey)
 
-// 				groupedKeys[newKey] = struct{}{}
-// 				delete(groupedKeys, key)
-// 				delete(groupedKeys, adjacentKey)
+				groupedKeys[newKey] = struct{}{}
+				delete(groupedKeys, key)
+				delete(groupedKeys, adjacentKey)
 
-// 				if newKey.Prefix.Bits() == 0 {
-// 					break
-// 				}
-// 				key = newKey
-// 				adjacentKey = StatKey{key.Server, AdjacentPrefix(key.Prefix)}
-// 				_, ok = groupedKeys[adjacentKey]
-// 			}
-// 		}
-// 		keys = a.SortedKeys(sortBy, serverFilter)
-// 		if len(keys) < top {
-// 			top = len(keys)
-// 		}
-// 	}
+				if newKey.Prefix.Bits() == 0 {
+					break
+				}
+				key = newKey
+				adjacentKey = StatKey{key.Server, AdjacentPrefix(key.Prefix)}
+				_, ok = groupedKeys[adjacentKey]
+			}
+		}
+		keys = a.SortedKeys(sortBy, serverFilter)
+		if len(keys) < top {
+			top = len(keys)
+		}
+	}
 
-// 	tableBuf := new(bytes.Buffer)
-// 	table := tablewriter.NewWriter(tableBuf)
-// 	table.SetCenterSeparator("  ")
-// 	table.SetColumnSeparator("")
-// 	table.SetRowSeparator("")
-// 	table.SetTablePadding("  ")
-// 	table.SetAutoFormatHeaders(false)
-// 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-// 	table.SetAlignment(tablewriter.ALIGN_LEFT)
-// 	table.SetHeaderLine(false)
-// 	table.SetBorder(false)
-// 	table.SetNoWhiteSpace(true)
-// 	tAlignment := []int{
-// 		tablewriter.ALIGN_RIGHT,
-// 		tablewriter.ALIGN_RIGHT,
-// 		tablewriter.ALIGN_RIGHT,
-// 		tablewriter.ALIGN_RIGHT,
-// 		tablewriter.ALIGN_RIGHT,
-// 		tablewriter.ALIGN_DEFAULT,
-// 		tablewriter.ALIGN_RIGHT,
-// 		tablewriter.ALIGN_RIGHT,
-// 		tablewriter.ALIGN_RIGHT,
-// 	}
-// 	tHeaders := []string{"CIDR", "Conn", "Bytes", "Reqs", "Avg", "URL", "URL Since", "URL Last", "UA"}
-// 	if a.Config.NoNetstat {
-// 		tAlignment = append(tAlignment[:1], tAlignment[2:]...)
-// 		tHeaders = append(tHeaders[:1], tHeaders[2:]...)
-// 	}
-// 	table.SetColumnAlignment(tAlignment)
-// 	table.SetHeader(tHeaders)
+	tableBuf := new(bytes.Buffer)
+	table := tablewriter.NewWriter(tableBuf)
+	table.SetCenterSeparator("  ")
+	table.SetColumnSeparator("")
+	table.SetRowSeparator("")
+	table.SetTablePadding("  ")
+	table.SetAutoFormatHeaders(false)
+	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetHeaderLine(false)
+	table.SetBorder(false)
+	table.SetNoWhiteSpace(true)
+	tAlignment := []int{
+		tablewriter.ALIGN_RIGHT,
+		tablewriter.ALIGN_RIGHT,
+		tablewriter.ALIGN_RIGHT,
+		tablewriter.ALIGN_RIGHT,
+		tablewriter.ALIGN_RIGHT,
+		tablewriter.ALIGN_DEFAULT,
+		tablewriter.ALIGN_RIGHT,
+		tablewriter.ALIGN_RIGHT,
+		tablewriter.ALIGN_RIGHT,
+	}
+	tHeaders := []string{"CIDR", "Conn", "Bytes", "Reqs", "Avg", "URL", "URL Since", "URL Last", "UA"}
+	if a.Config.NoNetstat {
+		tAlignment = append(tAlignment[:1], tAlignment[2:]...)
+		tHeaders = append(tHeaders[:1], tHeaders[2:]...)
+	}
+	table.SetColumnAlignment(tAlignment)
+	table.SetHeader(tHeaders)
 
-// 	for i := range top {
-// 		key := keys[i]
-// 		ipStats := a.stats[key]
-// 		total := ipStats.Size
-// 		reqTotal := ipStats.Requests
-// 		last := ipStats.LastURL
-// 		agents := len(ipStats.UAStore)
-// 		if a.Config.Truncate2 > 0 {
-// 			last = TruncateURLPathLen(last, a.Config.Truncate2)
-// 		} else if a.Config.Truncate {
-// 			last = TruncateURLPath(last)
-// 		}
+	for i := range top {
+		key := keys[i]
+		ipStats := a.stats[key]
+		total := ipStats.Size
+		reqTotal := ipStats.Requests
+		last := ipStats.LastURL
+		agents := len(ipStats.UAStore)
+		if a.Config.Truncate2 > 0 {
+			last = TruncateURLPathLen(last, a.Config.Truncate2)
+		} else if a.Config.Truncate {
+			last = TruncateURLPath(last)
+		}
 
-// 		var lastUpdateTime, lastAccessTime string
-// 		if a.Config.Absolute {
-// 			lastUpdateTime = ipStats.LastURLUpdate.Format(TimeFormat)
-// 			lastAccessTime = ipStats.LastURLAccess.Format(TimeFormat)
-// 		} else {
-// 			lastUpdateTime = humanize.Time(ipStats.LastURLUpdate)
-// 			lastAccessTime = humanize.Time(ipStats.LastURLAccess)
-// 		}
+		var lastUpdateTime, lastAccessTime string
+		if a.Config.Absolute {
+			lastUpdateTime = ipStats.LastURLUpdate.Format(TimeFormat)
+			lastAccessTime = ipStats.LastURLAccess.Format(TimeFormat)
+		} else {
+			lastUpdateTime = humanize.Time(ipStats.LastURLUpdate)
+			lastAccessTime = humanize.Time(ipStats.LastURLAccess)
+		}
 
-// 		average := total / uint64(reqTotal)
-// 		boldLine := false
-// 		if displayRecord != nil && displayRecord[key.Prefix] != ipStats.LastURLAccess {
-// 			// display this line in bold
-// 			boldLine = true
-// 			displayRecord[key.Prefix] = ipStats.LastURLAccess
-// 		}
+		average := total / uint64(reqTotal)
+		boldLine := false
+		if displayRecord != nil && displayRecord[key.Prefix] != ipStats.LastURLAccess {
+			// display this line in bold
+			boldLine = true
+			displayRecord[key.Prefix] = ipStats.LastURLAccess
+		}
 
-// 		row := []string{
-// 			key.Prefix.String(), "", humanize.IBytes(total), strconv.FormatUint(reqTotal, 10),
-// 			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime, strconv.Itoa(agents),
-// 		}
-// 		rowColors := slices.Repeat([]tablewriter.Colors{tableColorNone}, len(row))
-// 		if boldLine {
-// 			rowColors = slices.Repeat([]tablewriter.Colors{tableColorBold}, len(row))
-// 		} else {
-// 			// Bold color for 2nd column (connections)
-// 			rowColors[1] = tableColorBold
-// 		}
+		row := []string{
+			key.Prefix.String(), "", humanize.IBytes(total), strconv.FormatUint(reqTotal, 10),
+			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime, strconv.Itoa(agents),
+		}
+		rowColors := slices.Repeat([]tablewriter.Colors{tableColorNone}, len(row))
+		if boldLine {
+			rowColors = slices.Repeat([]tablewriter.Colors{tableColorBold}, len(row))
+		} else {
+			// Bold color for 2nd column (connections)
+			rowColors[1] = tableColorBold
+		}
 
-// 		if !a.Config.NoNetstat {
-// 			if _, ok := activeConn[key.Prefix]; ok {
-// 				row[1] = strconv.Itoa(activeConn[key.Prefix])
-// 			}
-// 		} else {
-// 			// Remove connections column
-// 			row = append(row[:1], row[2:]...)
-// 			rowColors = append(rowColors[:1], rowColors[2:]...)
-// 		}
+		if !a.Config.NoNetstat {
+			if _, ok := activeConn[key.Prefix]; ok {
+				row[1] = strconv.Itoa(activeConn[key.Prefix])
+			}
+		} else {
+			// Remove connections column
+			row = append(row[:1], row[2:]...)
+			rowColors = append(rowColors[:1], rowColors[2:]...)
+		}
 
-// 		table.Rich(row, rowColors)
-// 	}
-// 	table.Render()
-// 	a.logger.Writer().Write(tableBuf.Bytes())
-// }
+		table.Rich(row, rowColors)
+	}
+	table.Render()
+	a.logger.Writer().Write(tableBuf.Bytes())
+}
 
 func (a *Analyzer) GetCurrentServers() []string {
 	if a.Config.UseLock() {
