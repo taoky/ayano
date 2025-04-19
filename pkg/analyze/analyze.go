@@ -35,7 +35,7 @@ type UAKeyType = unique.Handle[string]
 type DirectoryTotalStats struct {
     Size     uint64
     Requests uint64
-    IPCount  map[netip.Prefix]struct{} // 新增 IP 统计
+    IPCount  map[netip.Prefix]struct{}
     LastURLUpdate time.Time
     LastURLAccess time.Time
 }
@@ -50,8 +50,8 @@ type IPStats struct {
 	Requests uint64
 	LastURL  string
 
-    // 按目录统计
-    DirStats map[string]*DirectoryStats
+	// 按目录统计
+	DirStats map[string]*DirectoryStats
 
 	// Used with daemon mode only
 	LastSize  uint64
@@ -71,7 +71,6 @@ func (i IPStats) UpdateWith(item parser.LogItem) IPStats {
 	i.Size += item.Size
 	i.Requests += 1
 
-	// 更新目录统计
 	if i.DirStats == nil {
 		i.DirStats = make(map[string]*DirectoryStats)
 	}
@@ -135,7 +134,7 @@ type Analyzer struct {
 
 	// [server, ip prefix] -> IPStats
 	stats map[StatKey]IPStats
-	dirStats map[string]*DirectoryTotalStats  // 新增目录统计
+	dirStats map[string]*DirectoryTotalStats
 	mu    sync.Mutex
 
 	logParser parser.Parser
@@ -163,8 +162,7 @@ type AnalyzerConfig struct {
 
 	Analyze bool
 	Daemon  bool
-	DirAnalyze bool  // 新增选项
-}
+	DirAnalyze bool
 
 func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet, cmdname string) {
 	flags.BoolVarP(&c.Absolute, "absolute", "a", c.Absolute, "Show absolute time for each item")
@@ -422,7 +420,7 @@ func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
 		a.dirStats[dir] = &DirectoryTotalStats{
 			Size:          logItem.Size,
 			Requests:      1,
-			IPCount:       ipCount,          // 使用已初始化的 ipCount
+			IPCount:       ipCount,
 			LastURLUpdate: logItem.Time,
 			LastURLAccess: logItem.Time,
 		}
@@ -489,7 +487,6 @@ func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy S
         defer a.mu.Unlock()
     }
 
-    // 将目录统计转换为切片以便排序
     type dirEntry struct {
         dir   string
         stats *DirectoryTotalStats
@@ -500,11 +497,6 @@ func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy S
         dirs = append(dirs, dirEntry{dir, stats})
     }
 
-    // 按流量大小排序
-    // slices.SortFunc(dirs, func(a, b dirEntry) int {
-    //     return int(b.stats.Size - a.stats.Size)
-    // })
-
 	if sortBy == SortBySize {
 		slices.SortFunc(dirs, func(a, b dirEntry) int {
 			return int(b.stats.Size - a.stats.Size)
@@ -514,8 +506,6 @@ func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy S
 			return int(b.stats.Requests - a.stats.Requests)
 		})
 	} 
-
-    // 创建表格
     tableBuf := new(bytes.Buffer)
     table := tablewriter.NewWriter(tableBuf)
     table.SetCenterSeparator("  ")
