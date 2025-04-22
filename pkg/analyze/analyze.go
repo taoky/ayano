@@ -163,7 +163,7 @@ type AnalyzerConfig struct {
 	Analyze bool
 	Daemon  bool
 	DirAnalyze bool
-
+}
 func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet, cmdname string) {
 	flags.BoolVarP(&c.Absolute, "absolute", "a", c.Absolute, "Show absolute time for each item")
 	flags.StringVarP(&c.LogOutput, "outlog", "o", c.LogOutput, "Change log output file")
