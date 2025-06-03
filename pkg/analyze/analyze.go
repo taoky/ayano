@@ -50,20 +50,20 @@ type IPStats struct {
 	Requests uint64
 	LastURL  string
 
-	// 按目录统计
+	// Directory statistics
 	DirStats map[string]*DirectoryStats
 
-	// Used with daemon mode only
+	// Used only in daemon mode
 	LastSize  uint64
 	FirstSeen time.Time
 
-	// Record time of last URL change
+	// Time of last URL change
 	LastURLUpdate time.Time
 
-	// Record time of last URL access
+	// Time of last URL access
 	LastURLAccess time.Time
 
-	// User-agent
+	// User-agent storage
 	UAStore map[UAKeyType]struct{}
 }
 
@@ -520,7 +520,7 @@ func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy S
 	table.SetBorder(false)
 	table.SetNoWhiteSpace(true)
 
-	// 设置表头
+	// Set table header
 	table.SetHeader([]string{"Directory", "Size", "Requests", "Avg Size", "IPs", "Last Access"})
 	table.SetColumnAlignment([]int{
 		tablewriter.ALIGN_LEFT,  // Directory
@@ -531,13 +531,13 @@ func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy S
 		tablewriter.ALIGN_RIGHT, // Last Access
 	})
 
-	// 取前N个目录显示
+	// Show top N directories
 	top := a.Config.TopN
 	if len(dirs) < top || top == 0 {
 		top = len(dirs)
 	}
 
-	// 添加行数据
+	// Add row data
 	for i := 0; i < top; i++ {
 		dir := dirs[i]
 		stats := dir.stats
@@ -553,7 +553,7 @@ func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy S
 			humanize.IBytes(stats.Size),
 			strconv.FormatUint(stats.Requests, 10),
 			humanize.IBytes(avgSize),
-			strconv.Itoa(len(stats.IPCount)), // 显示不同 IP 数量
+			strconv.Itoa(len(stats.IPCount)),
 			lastAccess,
 		}
 

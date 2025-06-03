@@ -72,11 +72,11 @@ func GetFirstDirectory(url string) string {
 	if url == "" {
 		return ""
 	}
-	// 去除查询参数
+	// Remove query parameters
 	if idx := strings.Index(url, "?"); idx >= 0 {
 		url = url[:idx]
 	}
-	// 分割路径
+	// Split the path
 	parts := strings.Split(strings.Trim(url, "/"), "/")
 	if len(parts) == 0 {
 		return "/"

@@ -110,7 +110,7 @@ func runCmd() *cobra.Command {
 	return cmd
 }
 
-// 首先创建一个辅助函数来处理通用的命令配置
+// First, create a helper function to handle common command configuration
 func setupAnalyzeCommand(cmd *cobra.Command, cmdType string) (analyze.AnalyzerConfig, error) {
 	config := analyze.DefaultConfig()
 	config.InstallFlags(cmd.Flags(), cmd.Name())
@@ -120,7 +120,7 @@ func setupAnalyzeCommand(cmd *cobra.Command, cmdType string) (analyze.AnalyzerCo
 	cmd.Flags().StringVar(&cpuProf, "cpuprof", "", "write CPU pprof data to file")
 	cmd.Flags().StringVar(&memProf, "memprof", "", "write memory pprof data to file")
 
-	// 返回一个函数来处理性能分析相关的逻辑
+	// Return a function to handle performance profiling logic
 	handleProf := func() error {
 		if cpuProf != "" {
 			f, err := os.Create(cpuProf)
@@ -147,7 +147,7 @@ func setupAnalyzeCommand(cmd *cobra.Command, cmdType string) (analyze.AnalyzerCo
 		return nil
 	}
 
-	// 设置命令执行函数
+	// Set the command execution function
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		if err := handleProf(); err != nil {
 			return err
@@ -166,7 +166,7 @@ func setupAnalyzeCommand(cmd *cobra.Command, cmdType string) (analyze.AnalyzerCo
 	return config, nil
 }
 
-// 然后简化原有的命令创建函数
+// Simplify the original command creation functions
 func analyzeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "analyze [filename...]",
