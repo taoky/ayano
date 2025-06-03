@@ -22,6 +22,7 @@ Available Commands:
   analyze     Log analyse mode (no tail following, only show top N at the end, and implies --whole)
   completion  Generate the autocompletion script for the specified shell
   daemon      Daemon mode, prints out IP CIDR and total size every 1 GiB
+  dir-analyze Analyze log by directory (show statistics for each first-level directory)
   help        Help about any command
   list        List various items
   run         Run and follow the log file(s)

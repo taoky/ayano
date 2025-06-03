@@ -4,3 +4,4 @@ ayano.test
 *.pprof
 __debug_bin*
 /dist/
+*.log

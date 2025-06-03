@@ -32,28 +32,59 @@ var (
 
 type UAKeyType = unique.Handle[string]
 
+type DirectoryTotalStats struct {
+	Size          uint64
+	Requests      uint64
+	IPCount       map[netip.Prefix]struct{}
+	LastURLUpdate time.Time
+	LastURLAccess time.Time
+}
+
+type DirectoryStats struct {
+	Size     uint64
+	Requests uint64
+}
+
 type IPStats struct {
 	Size     uint64
 	Requests uint64
 	LastURL  string
 
-	// Used with daemon mode only
+	// Directory statistics
+	DirStats map[string]*DirectoryStats
+
+	// Used only in daemon mode
 	LastSize  uint64
 	FirstSeen time.Time
 
-	// Record time of last URL change
+	// Time of last URL change
 	LastURLUpdate time.Time
 
-	// Record time of last URL access
+	// Time of last URL access
 	LastURLAccess time.Time
 
-	// User-agent
+	// User-agent storage
 	UAStore map[UAKeyType]struct{}
 }
 
 func (i IPStats) UpdateWith(item parser.LogItem) IPStats {
 	i.Size += item.Size
 	i.Requests += 1
+
+	if i.DirStats == nil {
+		i.DirStats = make(map[string]*DirectoryStats)
+	}
+	dir := GetFirstDirectory(item.URL)
+	if stats, ok := i.DirStats[dir]; ok {
+		stats.Size += item.Size
+		stats.Requests++
+	} else {
+		i.DirStats[dir] = &DirectoryStats{
+			Size:     item.Size,
+			Requests: 1,
+		}
+	}
+
 	if item.URL != i.LastURL {
 		if i.LastURLUpdate.Before(item.Time) {
 			i.LastURL = item.URL
@@ -102,8 +133,9 @@ type Analyzer struct {
 	Config AnalyzerConfig
 
 	// [server, ip prefix] -> IPStats
-	stats map[StatKey]IPStats
-	mu    sync.Mutex
+	stats    map[StatKey]IPStats
+	dirStats map[string]*DirectoryTotalStats
+	mu       sync.Mutex
 
 	logParser parser.Parser
 	logger    *log.Logger
@@ -128,8 +160,9 @@ type AnalyzerConfig struct {
 	Truncate2  int
 	Whole      bool
 
-	Analyze bool
-	Daemon  bool
+	Analyze    bool
+	Daemon     bool
+	DirAnalyze bool
 }
 
 func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet, cmdname string) {
@@ -366,6 +399,34 @@ func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
 		a.stats[StatKey{a.Config.Server, clientPrefix}] = ipStats
 	}
 
+	if a.dirStats == nil {
+		a.dirStats = make(map[string]*DirectoryTotalStats)
+	}
+
+	dir := GetFirstDirectory(logItem.URL)
+	if stats, ok := a.dirStats[dir]; ok {
+		stats.Size += logItem.Size
+		stats.Requests++
+		if stats.IPCount == nil {
+			stats.IPCount = make(map[netip.Prefix]struct{})
+		}
+		stats.IPCount[clientPrefix] = struct{}{}
+		if logItem.Time.After(stats.LastURLAccess) {
+			stats.LastURLUpdate = logItem.Time
+			stats.LastURLAccess = logItem.Time
+		}
+	} else {
+		ipCount := make(map[netip.Prefix]struct{})
+		ipCount[clientPrefix] = struct{}{}
+		a.dirStats[dir] = &DirectoryTotalStats{
+			Size:          logItem.Size,
+			Requests:      1,
+			IPCount:       ipCount,
+			LastURLUpdate: logItem.Time,
+			LastURLAccess: logItem.Time,
+		}
+	}
+
 	return nil
 }
 
@@ -420,6 +481,87 @@ func (a *Analyzer) SortedKeys(sortBy SortByFlag, serverFilter string) []StatKey 
 		slices.SortFunc(keys, sortFunc)
 	}
 	return keys
+}
+func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag, serverFilter string) {
+	if a.Config.UseLock() {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+	}
+
+	type dirEntry struct {
+		dir   string
+		stats *DirectoryTotalStats
+	}
+
+	dirs := make([]dirEntry, 0, len(a.dirStats))
+	for dir, stats := range a.dirStats {
+		dirs = append(dirs, dirEntry{dir, stats})
+	}
+
+	if sortBy == SortBySize {
+		slices.SortFunc(dirs, func(a, b dirEntry) int {
+			return int(b.stats.Size - a.stats.Size)
+		})
+	} else if sortBy == SortByRequests {
+		slices.SortFunc(dirs, func(a, b dirEntry) int {
+			return int(b.stats.Requests - a.stats.Requests)
+		})
+	}
+	tableBuf := new(bytes.Buffer)
+	table := tablewriter.NewWriter(tableBuf)
+	table.SetCenterSeparator("  ")
+	table.SetColumnSeparator("")
+	table.SetRowSeparator("")
+	table.SetTablePadding("  ")
+	table.SetAutoFormatHeaders(false)
+	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetHeaderLine(false)
+	table.SetBorder(false)
+	table.SetNoWhiteSpace(true)
+
+	// Set table header
+	table.SetHeader([]string{"Directory", "Size", "Requests", "Avg Size", "IPs", "Last Access"})
+	table.SetColumnAlignment([]int{
+		tablewriter.ALIGN_LEFT,  // Directory
+		tablewriter.ALIGN_RIGHT, // Size
+		tablewriter.ALIGN_RIGHT, // Requests
+		tablewriter.ALIGN_RIGHT, // Avg Size
+		tablewriter.ALIGN_RIGHT, // IPs
+		tablewriter.ALIGN_RIGHT, // Last Access
+	})
+
+	// Show top N directories
+	top := a.Config.TopN
+	if len(dirs) < top || top == 0 {
+		top = len(dirs)
+	}
+
+	// Add row data
+	for i := 0; i < top; i++ {
+		dir := dirs[i]
+		stats := dir.stats
+		avgSize := stats.Size / uint64(stats.Requests)
+
+		lastAccess := humanize.Time(stats.LastURLAccess)
+		if a.Config.Absolute {
+			lastAccess = stats.LastURLAccess.Format(TimeFormat)
+		}
+
+		row := []string{
+			dir.dir,
+			humanize.IBytes(stats.Size),
+			strconv.FormatUint(stats.Requests, 10),
+			humanize.IBytes(avgSize),
+			strconv.Itoa(len(stats.IPCount)),
+			lastAccess,
+		}
+
+		table.Append(row)
+	}
+
+	table.Render()
+	a.logger.Writer().Write(tableBuf.Bytes())
 }
 
 func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag, serverFilter string) {

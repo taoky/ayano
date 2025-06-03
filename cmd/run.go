@@ -52,8 +52,16 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 			systemd.MustNotifyReady()
 		}
 	}()
-
-	if config.Analyze {
+	if config.DirAnalyze {
+		for _, filename := range filenames {
+			err = analyzer.AnalyzeFile(filename)
+			if err != nil {
+				break
+			}
+		}
+		analyzer.DirAnalyze(nil, config.SortBy, "")
+		return err
+	} else if config.Analyze {
 		for _, filename := range filenames {
 			err = analyzer.AnalyzeFile(filename)
 			if err != nil {
@@ -102,12 +110,8 @@ func runCmd() *cobra.Command {
 	return cmd
 }
 
-func analyzeCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "analyze [filename...]",
-		Aliases: []string{"analyse"},
-		Short:   "Log analyse mode (no tail following, only show top N at the end, and implies --whole)",
-	}
+// First, create a helper function to handle common command configuration
+func setupAnalyzeCommand(cmd *cobra.Command, cmdType string) (analyze.AnalyzerConfig, error) {
 	config := analyze.DefaultConfig()
 	config.InstallFlags(cmd.Flags(), cmd.Name())
 
@@ -115,8 +119,9 @@ func analyzeCmd() *cobra.Command {
 	var memProf string
 	cmd.Flags().StringVar(&cpuProf, "cpuprof", "", "write CPU pprof data to file")
 	cmd.Flags().StringVar(&memProf, "memprof", "", "write memory pprof data to file")
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		config.Analyze = true
+
+	// Return a function to handle performance profiling logic
+	handleProf := func() error {
 		if cpuProf != "" {
 			f, err := os.Create(cpuProf)
 			if err != nil {
@@ -128,7 +133,7 @@ func analyzeCmd() *cobra.Command {
 			}
 			defer pprof.StopCPUProfile()
 		}
-		err := runWithConfig(cmd, args, config)
+
 		if memProf != "" {
 			f, err := os.Create(memProf)
 			if err != nil {
@@ -139,8 +144,45 @@ func analyzeCmd() *cobra.Command {
 				return fmt.Errorf("failed to write memory pprof: %w", err)
 			}
 		}
-		return err
+		return nil
 	}
+
+	// Set the command execution function
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		if err := handleProf(); err != nil {
+			return err
+		}
+
+		switch cmdType {
+		case "analyze":
+			config.Analyze = true
+		case "dir-analyze":
+			config.DirAnalyze = true
+		}
+
+		return runWithConfig(cmd, args, config)
+	}
+
+	return config, nil
+}
+
+// Simplify the original command creation functions
+func analyzeCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "analyze [filename...]",
+		Aliases: []string{"analyse"},
+		Short:   "Log analyse mode (no tail following, only show top N at the end, and implies --whole)",
+	}
+	setupAnalyzeCommand(cmd, "analyze")
+	return cmd
+}
+
+func dirAnalyzeCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "dir-analyze [filename...]",
+		Short: "Analyze log by directory (show statistics for each first-level directory)",
+	}
+	setupAnalyzeCommand(cmd, "dir-analyze")
 	return cmd
 }
 
