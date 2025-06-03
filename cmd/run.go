@@ -61,7 +61,7 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 		}
 		analyzer.DirAnalyze(nil, config.SortBy, "")
 		return err
-	}else if config.Analyze {
+	} else if config.Analyze {
 		for _, filename := range filenames {
 			err = analyzer.AnalyzeFile(filename)
 			if err != nil {
@@ -112,78 +112,78 @@ func runCmd() *cobra.Command {
 
 // 首先创建一个辅助函数来处理通用的命令配置
 func setupAnalyzeCommand(cmd *cobra.Command, cmdType string) (analyze.AnalyzerConfig, error) {
-    config := analyze.DefaultConfig()
-    config.InstallFlags(cmd.Flags(), cmd.Name())
+	config := analyze.DefaultConfig()
+	config.InstallFlags(cmd.Flags(), cmd.Name())
 
-    var cpuProf string
-    var memProf string
-    cmd.Flags().StringVar(&cpuProf, "cpuprof", "", "write CPU pprof data to file")
-    cmd.Flags().StringVar(&memProf, "memprof", "", "write memory pprof data to file")
+	var cpuProf string
+	var memProf string
+	cmd.Flags().StringVar(&cpuProf, "cpuprof", "", "write CPU pprof data to file")
+	cmd.Flags().StringVar(&memProf, "memprof", "", "write memory pprof data to file")
 
-    // 返回一个函数来处理性能分析相关的逻辑
-    handleProf := func() error {
-        if cpuProf != "" {
-            f, err := os.Create(cpuProf)
-            if err != nil {
-                return fmt.Errorf("failed to create CPU pprof file: %w", err)
-            }
-            defer f.Close()
-            if err := pprof.StartCPUProfile(f); err != nil {
-                return fmt.Errorf("failed to start CPU pprof: %w", err)
-            }
-            defer pprof.StopCPUProfile()
-        }
+	// 返回一个函数来处理性能分析相关的逻辑
+	handleProf := func() error {
+		if cpuProf != "" {
+			f, err := os.Create(cpuProf)
+			if err != nil {
+				return fmt.Errorf("failed to create CPU pprof file: %w", err)
+			}
+			defer f.Close()
+			if err := pprof.StartCPUProfile(f); err != nil {
+				return fmt.Errorf("failed to start CPU pprof: %w", err)
+			}
+			defer pprof.StopCPUProfile()
+		}
 
-        if memProf != "" {
-            f, err := os.Create(memProf)
-            if err != nil {
-                return fmt.Errorf("failed to create memory pprof file: %w", err)
-            }
-            defer f.Close()
-            if err := pprof.WriteHeapProfile(f); err != nil {
-                return fmt.Errorf("failed to write memory pprof: %w", err)
-            }
-        }
-        return nil
-    }
+		if memProf != "" {
+			f, err := os.Create(memProf)
+			if err != nil {
+				return fmt.Errorf("failed to create memory pprof file: %w", err)
+			}
+			defer f.Close()
+			if err := pprof.WriteHeapProfile(f); err != nil {
+				return fmt.Errorf("failed to write memory pprof: %w", err)
+			}
+		}
+		return nil
+	}
 
-    // 设置命令执行函数
-    cmd.RunE = func(cmd *cobra.Command, args []string) error {
-        if err := handleProf(); err != nil {
-            return err
-        }
+	// 设置命令执行函数
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		if err := handleProf(); err != nil {
+			return err
+		}
 
-        switch cmdType {
-        case "analyze":
-            config.Analyze = true
-        case "dir-analyze":
-            config.DirAnalyze = true
-        }
+		switch cmdType {
+		case "analyze":
+			config.Analyze = true
+		case "dir-analyze":
+			config.DirAnalyze = true
+		}
 
-        return runWithConfig(cmd, args, config)
-    }
+		return runWithConfig(cmd, args, config)
+	}
 
-    return config, nil
+	return config, nil
 }
 
 // 然后简化原有的命令创建函数
 func analyzeCmd() *cobra.Command {
-    cmd := &cobra.Command{
-        Use:     "analyze [filename...]",
-        Aliases: []string{"analyse"},
-        Short:   "Log analyse mode (no tail following, only show top N at the end, and implies --whole)",
-    }
-    setupAnalyzeCommand(cmd, "analyze")
-    return cmd
+	cmd := &cobra.Command{
+		Use:     "analyze [filename...]",
+		Aliases: []string{"analyse"},
+		Short:   "Log analyse mode (no tail following, only show top N at the end, and implies --whole)",
+	}
+	setupAnalyzeCommand(cmd, "analyze")
+	return cmd
 }
 
 func dirAnalyzeCmd() *cobra.Command {
-    cmd := &cobra.Command{
-        Use:   "dir-analyze [filename...]",
-        Short: "Analyze log by directory (show statistics for each first-level directory)",
-    }
-    setupAnalyzeCommand(cmd, "dir-analyze")
-    return cmd
+	cmd := &cobra.Command{
+		Use:   "dir-analyze [filename...]",
+		Short: "Analyze log by directory (show statistics for each first-level directory)",
+	}
+	setupAnalyzeCommand(cmd, "dir-analyze")
+	return cmd
 }
 
 func daemonCmd() *cobra.Command {

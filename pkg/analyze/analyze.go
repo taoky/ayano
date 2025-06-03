@@ -33,16 +33,16 @@ var (
 type UAKeyType = unique.Handle[string]
 
 type DirectoryTotalStats struct {
-    Size     uint64
-    Requests uint64
-    IPCount  map[netip.Prefix]struct{}
-    LastURLUpdate time.Time
-    LastURLAccess time.Time
+	Size          uint64
+	Requests      uint64
+	IPCount       map[netip.Prefix]struct{}
+	LastURLUpdate time.Time
+	LastURLAccess time.Time
 }
 
 type DirectoryStats struct {
-    Size     uint64
-    Requests uint64
+	Size     uint64
+	Requests uint64
 }
 
 type IPStats struct {
@@ -133,9 +133,9 @@ type Analyzer struct {
 	Config AnalyzerConfig
 
 	// [server, ip prefix] -> IPStats
-	stats map[StatKey]IPStats
+	stats    map[StatKey]IPStats
 	dirStats map[string]*DirectoryTotalStats
-	mu    sync.Mutex
+	mu       sync.Mutex
 
 	logParser parser.Parser
 	logger    *log.Logger
@@ -160,10 +160,11 @@ type AnalyzerConfig struct {
 	Truncate2  int
 	Whole      bool
 
-	Analyze bool
-	Daemon  bool
+	Analyze    bool
+	Daemon     bool
 	DirAnalyze bool
 }
+
 func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet, cmdname string) {
 	flags.BoolVarP(&c.Absolute, "absolute", "a", c.Absolute, "Show absolute time for each item")
 	flags.StringVarP(&c.LogOutput, "outlog", "o", c.LogOutput, "Change log output file")
@@ -399,21 +400,21 @@ func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
 	}
 
 	if a.dirStats == nil {
-        a.dirStats = make(map[string]*DirectoryTotalStats)
-    }
+		a.dirStats = make(map[string]*DirectoryTotalStats)
+	}
 
-    dir := GetFirstDirectory(logItem.URL)
-    if stats, ok := a.dirStats[dir]; ok {
-        stats.Size += logItem.Size
-        stats.Requests++
+	dir := GetFirstDirectory(logItem.URL)
+	if stats, ok := a.dirStats[dir]; ok {
+		stats.Size += logItem.Size
+		stats.Requests++
 		if stats.IPCount == nil {
 			stats.IPCount = make(map[netip.Prefix]struct{})
 		}
 		stats.IPCount[clientPrefix] = struct{}{}
-        if logItem.Time.After(stats.LastURLAccess) {
-            stats.LastURLUpdate = logItem.Time
-            stats.LastURLAccess = logItem.Time
-        }
+		if logItem.Time.After(stats.LastURLAccess) {
+			stats.LastURLUpdate = logItem.Time
+			stats.LastURLAccess = logItem.Time
+		}
 	} else {
 		ipCount := make(map[netip.Prefix]struct{})
 		ipCount[clientPrefix] = struct{}{}
@@ -482,20 +483,20 @@ func (a *Analyzer) SortedKeys(sortBy SortByFlag, serverFilter string) []StatKey 
 	return keys
 }
 func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag, serverFilter string) {
-    if a.Config.UseLock() {
-        a.mu.Lock()
-        defer a.mu.Unlock()
-    }
+	if a.Config.UseLock() {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+	}
 
-    type dirEntry struct {
-        dir   string
-        stats *DirectoryTotalStats
-    }
-    
-    dirs := make([]dirEntry, 0, len(a.dirStats))
-    for dir, stats := range a.dirStats {
-        dirs = append(dirs, dirEntry{dir, stats})
-    }
+	type dirEntry struct {
+		dir   string
+		stats *DirectoryTotalStats
+	}
+
+	dirs := make([]dirEntry, 0, len(a.dirStats))
+	for dir, stats := range a.dirStats {
+		dirs = append(dirs, dirEntry{dir, stats})
+	}
 
 	if sortBy == SortBySize {
 		slices.SortFunc(dirs, func(a, b dirEntry) int {
@@ -505,62 +506,62 @@ func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy S
 		slices.SortFunc(dirs, func(a, b dirEntry) int {
 			return int(b.stats.Requests - a.stats.Requests)
 		})
-	} 
-    tableBuf := new(bytes.Buffer)
-    table := tablewriter.NewWriter(tableBuf)
-    table.SetCenterSeparator("  ")
-    table.SetColumnSeparator("")
-    table.SetRowSeparator("")
-    table.SetTablePadding("  ")
-    table.SetAutoFormatHeaders(false)
-    table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-    table.SetAlignment(tablewriter.ALIGN_LEFT)
-    table.SetHeaderLine(false)
-    table.SetBorder(false)
-    table.SetNoWhiteSpace(true)
+	}
+	tableBuf := new(bytes.Buffer)
+	table := tablewriter.NewWriter(tableBuf)
+	table.SetCenterSeparator("  ")
+	table.SetColumnSeparator("")
+	table.SetRowSeparator("")
+	table.SetTablePadding("  ")
+	table.SetAutoFormatHeaders(false)
+	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetHeaderLine(false)
+	table.SetBorder(false)
+	table.SetNoWhiteSpace(true)
 
-    // 设置表头
-    table.SetHeader([]string{"Directory", "Size", "Requests", "Avg Size", "IPs", "Last Access"})
-    table.SetColumnAlignment([]int{
-        tablewriter.ALIGN_LEFT,   // Directory
-        tablewriter.ALIGN_RIGHT,  // Size
-        tablewriter.ALIGN_RIGHT,  // Requests
-        tablewriter.ALIGN_RIGHT,  // Avg Size
-        tablewriter.ALIGN_RIGHT,  // IPs
-        tablewriter.ALIGN_RIGHT,  // Last Access
-    })
+	// 设置表头
+	table.SetHeader([]string{"Directory", "Size", "Requests", "Avg Size", "IPs", "Last Access"})
+	table.SetColumnAlignment([]int{
+		tablewriter.ALIGN_LEFT,  // Directory
+		tablewriter.ALIGN_RIGHT, // Size
+		tablewriter.ALIGN_RIGHT, // Requests
+		tablewriter.ALIGN_RIGHT, // Avg Size
+		tablewriter.ALIGN_RIGHT, // IPs
+		tablewriter.ALIGN_RIGHT, // Last Access
+	})
 
-    // 取前N个目录显示
-    top := a.Config.TopN
-    if len(dirs) < top || top == 0 {
-        top = len(dirs)
-    }
+	// 取前N个目录显示
+	top := a.Config.TopN
+	if len(dirs) < top || top == 0 {
+		top = len(dirs)
+	}
 
-    // 添加行数据
-    for i := 0; i < top; i++ {
-        dir := dirs[i]
-        stats := dir.stats
-        avgSize := stats.Size / uint64(stats.Requests)
-        
-        lastAccess := humanize.Time(stats.LastURLAccess)
-        if a.Config.Absolute {
-            lastAccess = stats.LastURLAccess.Format(TimeFormat)
-        }
+	// 添加行数据
+	for i := 0; i < top; i++ {
+		dir := dirs[i]
+		stats := dir.stats
+		avgSize := stats.Size / uint64(stats.Requests)
 
-        row := []string{
-            dir.dir,
-            humanize.IBytes(stats.Size),
-            strconv.FormatUint(stats.Requests, 10),
-            humanize.IBytes(avgSize),
-            strconv.Itoa(len(stats.IPCount)),  // 显示不同 IP 数量
-            lastAccess,
-        }
-        
-        table.Append(row)
-    }
+		lastAccess := humanize.Time(stats.LastURLAccess)
+		if a.Config.Absolute {
+			lastAccess = stats.LastURLAccess.Format(TimeFormat)
+		}
 
-    table.Render()
-    a.logger.Writer().Write(tableBuf.Bytes())
+		row := []string{
+			dir.dir,
+			humanize.IBytes(stats.Size),
+			strconv.FormatUint(stats.Requests, 10),
+			humanize.IBytes(avgSize),
+			strconv.Itoa(len(stats.IPCount)), // 显示不同 IP 数量
+			lastAccess,
+		}
+
+		table.Append(row)
+	}
+
+	table.Render()
+	a.logger.Writer().Write(tableBuf.Bytes())
 }
 
 func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag, serverFilter string) {

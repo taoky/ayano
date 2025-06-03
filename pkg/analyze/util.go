@@ -41,8 +41,8 @@ func (s SizeFlag) Type() string {
 type SortByFlag string
 
 const (
-	SortBySize     SortByFlag = "size"
-	SortByRequests SortByFlag = "requests"
+	SortBySize      SortByFlag = "size"
+	SortByRequests  SortByFlag = "requests"
 	SortByDirectory SortByFlag = "directory"
 )
 
@@ -51,17 +51,17 @@ func (s SortByFlag) String() string {
 }
 
 func (s *SortByFlag) Set(value string) error {
-    switch value {
-    case "size":
-        *s = SortBySize
-    case "requests", "reqs":
-        *s = SortByRequests
-    case "directory", "dir":
-        *s = SortByDirectory 
-    default:
-        return errors.New(`must be one of "size", "requests" or "directory"`)
-    }
-    return nil
+	switch value {
+	case "size":
+		*s = SortBySize
+	case "requests", "reqs":
+		*s = SortByRequests
+	case "directory", "dir":
+		*s = SortByDirectory
+	default:
+		return errors.New(`must be one of "size", "requests" or "directory"`)
+	}
+	return nil
 }
 
 func (s SortByFlag) Type() string {
@@ -69,19 +69,19 @@ func (s SortByFlag) Type() string {
 }
 
 func GetFirstDirectory(url string) string {
-    if url == "" {
-        return ""
-    }
-    // 去除查询参数
-    if idx := strings.Index(url, "?"); idx >= 0 {
-        url = url[:idx]
-    }
-    // 分割路径
-    parts := strings.Split(strings.Trim(url, "/"), "/")
-    if len(parts) == 0 {
-        return "/"
-    }
-    return "/" + parts[0]
+	if url == "" {
+		return ""
+	}
+	// 去除查询参数
+	if idx := strings.Index(url, "?"); idx >= 0 {
+		url = url[:idx]
+	}
+	// 分割路径
+	parts := strings.Split(strings.Trim(url, "/"), "/")
+	if len(parts) == 0 {
+		return "/"
+	}
+	return "/" + parts[0]
 }
 
 func (a *Analyzer) IPPrefix(ip netip.Addr) netip.Prefix {

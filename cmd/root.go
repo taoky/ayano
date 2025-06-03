@@ -21,7 +21,6 @@ func RootCmd() *cobra.Command {
 		daemonCmd(),
 		dirAnalyzeCmd(),
 		listCmd(),
-		
 	)
 	return rootCmd
 }
