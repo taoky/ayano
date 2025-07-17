@@ -126,6 +126,7 @@ Ayano supports following types of log format. You could also use `ayano list par
 
 4. GoAccess format string. You shall set `GOACCESS_CONFIG` env to a goaccess config file beforehand ([format recognized](https://github.com/taoky/goaccessfmt?tab=readme-ov-file#config-file-format), [example](assets/goaccess.conf)).
 5. Tencent CDN log format.
+6. [rsync-proxy](https://github.com/ustclug/rsync-proxy) log format.
 
 ## Note
 
