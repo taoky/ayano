@@ -165,6 +165,9 @@ type AnalyzerConfig struct {
 	Analyze    bool
 	Daemon     bool
 	DirAnalyze bool
+
+	CpuProfile string
+	MemProfile string
 }
 
 func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet, cmdname string) {
@@ -181,6 +184,11 @@ func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet, cmdname string) {
 	flags.IntVarP(&c.TopN, "top", "n", c.TopN, "Number of top items to show")
 	flags.BoolVar(&c.Truncate, "truncate", c.Truncate, "Truncate long URLs from output")
 	flags.IntVar(&c.Truncate2, "truncate-to", c.Truncate2, "Truncate URLs to given length, overrides --truncate")
+
+	flags.StringVar(&c.CpuProfile, "cpuprofile", c.CpuProfile, "Write CPU profiling information")
+	flags.StringVar(&c.MemProfile, "memprofile", c.MemProfile, "Write memory profiling information")
+	flags.MarkHidden("cpuprofile")
+	flags.MarkHidden("memprofile")
 
 	if cmdname == "analyze" {
 		c.Whole = true

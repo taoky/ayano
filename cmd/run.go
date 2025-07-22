@@ -14,6 +14,7 @@ import (
 	"github.com/taoky/ayano/pkg/fileiter"
 	"github.com/taoky/ayano/pkg/systemd"
 	"github.com/taoky/ayano/pkg/tui"
+	"github.com/taoky/ayano/pkg/util"
 )
 
 const defaultFilename = "/var/log/nginx/mirrors/access_json.log"
@@ -52,23 +53,35 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 			systemd.MustNotifyReady()
 		}
 	}()
-	if config.DirAnalyze {
+	analyzeFn := func() {
 		for _, filename := range filenames {
 			err = analyzer.AnalyzeFile(filename)
 			if err != nil {
 				break
 			}
+		}
+	}
+	if config.DirAnalyze {
+		if config.CpuProfile != "" {
+			util.RunCPUProfile(config.CpuProfile, analyzeFn)
+		} else {
+			analyzeFn()
 		}
 		analyzer.DirAnalyze(nil, config.SortBy, "")
+		if config.MemProfile != "" {
+			util.MemProfile(config.MemProfile, "allocs")
+		}
 		return err
 	} else if config.Analyze {
-		for _, filename := range filenames {
-			err = analyzer.AnalyzeFile(filename)
-			if err != nil {
-				break
-			}
+		if config.CpuProfile != "" {
+			util.RunCPUProfile(config.CpuProfile, analyzeFn)
+		} else {
+			analyzeFn()
 		}
 		analyzer.PrintTopValues(nil, config.SortBy, "")
+		if config.MemProfile != "" {
+			util.MemProfile(config.MemProfile, "allocs")
+		}
 		return err
 	} else {
 		// Tail mode
