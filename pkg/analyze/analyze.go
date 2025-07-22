@@ -185,10 +185,8 @@ func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet, cmdname string) {
 	flags.BoolVar(&c.Truncate, "truncate", c.Truncate, "Truncate long URLs from output")
 	flags.IntVar(&c.Truncate2, "truncate-to", c.Truncate2, "Truncate URLs to given length, overrides --truncate")
 
-	flags.StringVar(&c.CpuProfile, "cpuprofile", c.CpuProfile, "Write CPU profiling information")
-	flags.StringVar(&c.MemProfile, "memprofile", c.MemProfile, "Write memory profiling information")
-	flags.MarkHidden("cpuprofile")
-	flags.MarkHidden("memprofile")
+	flags.StringVar(&c.CpuProfile, "cpuprof", c.CpuProfile, "Write CPU profiling information")
+	flags.StringVar(&c.MemProfile, "memprof", c.MemProfile, "Write memory profiling information")
 
 	if cmdname == "analyze" {
 		c.Whole = true
@@ -671,6 +669,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 	table.SetColumnAlignment(tAlignment)
 	table.SetHeader(tHeaders)
 
+	now := time.Now()
 	for i := range top {
 		key := keys[i]
 		ipStats := a.stats[key]
@@ -689,8 +688,8 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 			lastUpdateTime = ipStats.LastURLUpdate.Format(TimeFormat)
 			lastAccessTime = ipStats.LastURLAccess.Format(TimeFormat)
 		} else {
-			lastUpdateTime = humanize.Time(ipStats.LastURLUpdate)
-			lastAccessTime = humanize.Time(ipStats.LastURLAccess)
+			lastUpdateTime = HumanizeAgo(now.Sub(ipStats.LastURLUpdate))
+			lastAccessTime = HumanizeAgo(now.Sub(ipStats.LastURLAccess))
 		}
 
 		average := total / uint64(reqTotal)

@@ -6,10 +6,10 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
-	"runtime/pprof"
 	"syscall"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/taoky/ayano/pkg/analyze"
 	"github.com/taoky/ayano/pkg/fileiter"
 	"github.com/taoky/ayano/pkg/systemd"
@@ -123,49 +123,24 @@ func runCmd() *cobra.Command {
 	return cmd
 }
 
+func normalizeAnalyzeFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
+	switch name {
+	case "cpuprofile":
+		name = "cpuprof"
+	case "memprofile":
+		name = "memprof"
+	}
+	return pflag.NormalizedName(name)
+}
+
 // First, create a helper function to handle common command configuration
 func setupAnalyzeCommand(cmd *cobra.Command, cmdType string) (analyze.AnalyzerConfig, error) {
 	config := analyze.DefaultConfig()
 	config.InstallFlags(cmd.Flags(), cmd.Name())
-
-	var cpuProf string
-	var memProf string
-	cmd.Flags().StringVar(&cpuProf, "cpuprof", "", "write CPU pprof data to file")
-	cmd.Flags().StringVar(&memProf, "memprof", "", "write memory pprof data to file")
-
-	// Return a function to handle performance profiling logic
-	handleProf := func() error {
-		if cpuProf != "" {
-			f, err := os.Create(cpuProf)
-			if err != nil {
-				return fmt.Errorf("failed to create CPU pprof file: %w", err)
-			}
-			defer f.Close()
-			if err := pprof.StartCPUProfile(f); err != nil {
-				return fmt.Errorf("failed to start CPU pprof: %w", err)
-			}
-			defer pprof.StopCPUProfile()
-		}
-
-		if memProf != "" {
-			f, err := os.Create(memProf)
-			if err != nil {
-				return fmt.Errorf("failed to create memory pprof file: %w", err)
-			}
-			defer f.Close()
-			if err := pprof.WriteHeapProfile(f); err != nil {
-				return fmt.Errorf("failed to write memory pprof: %w", err)
-			}
-		}
-		return nil
-	}
+	cmd.Flags().SetNormalizeFunc(normalizeAnalyzeFlags)
 
 	// Set the command execution function
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		if err := handleProf(); err != nil {
-			return err
-		}
-
 		switch cmdType {
 		case "analyze":
 			config.Analyze = true
@@ -192,8 +167,9 @@ func analyzeCmd() *cobra.Command {
 
 func dirAnalyzeCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "dir-analyze [filename...]",
-		Short: "Analyze log by directory (show statistics for each first-level directory)",
+		Use:     "dir-analyze [filename...]",
+		Aliases: []string{"dir-analyse"},
+		Short:   "Analyze log by directory (show statistics for each first-level directory)",
 	}
 	setupAnalyzeCommand(cmd, "dir-analyze")
 	return cmd

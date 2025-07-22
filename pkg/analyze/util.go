@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dustin/go-humanize"
 )
@@ -201,4 +202,29 @@ func TruncateFilenameLen(input string, target int) string {
 	}
 	// truncating basename alone would not suffice, keep characters from end
 	return input[len(input)-target:]
+}
+
+func HumanizeAgo(d time.Duration) string {
+	if d < 0 {
+		return "in the future"
+	}
+	if d < time.Second {
+		return "now"
+	}
+	if d < time.Minute {
+		return fmt.Sprintf("%ds ago", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		minutes := int(d.Minutes())
+		seconds := int(d.Seconds()) - minutes*60
+		return fmt.Sprintf("%dm%2ds ago", minutes, seconds)
+	}
+	if d < 24*time.Hour {
+		hours := int(d.Hours())
+		minutes := int(d.Minutes()) - hours*60
+		return fmt.Sprintf("%dh%2dm ago", hours, minutes)
+	}
+	days := int(d.Hours()) / 24
+	hours := int(d.Hours()) - days*24
+	return fmt.Sprintf("%dd%2dh ago", days, hours)
 }
