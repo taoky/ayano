@@ -67,21 +67,23 @@ type IPStats struct {
 	UAStore map[UAKeyType]struct{}
 }
 
-func (i IPStats) UpdateWith(item parser.LogItem) IPStats {
+func (i IPStats) UpdateWith(item parser.LogItem, dirStats bool) IPStats {
 	i.Size += item.Size
 	i.Requests += 1
 
-	if i.DirStats == nil {
-		i.DirStats = make(map[string]*DirectoryStats)
-	}
-	dir := GetFirstDirectory(item.URL)
-	if stats, ok := i.DirStats[dir]; ok {
-		stats.Size += item.Size
-		stats.Requests++
-	} else {
-		i.DirStats[dir] = &DirectoryStats{
-			Size:     item.Size,
-			Requests: 1,
+	if dirStats {
+		if i.DirStats == nil {
+			i.DirStats = make(map[string]*DirectoryStats)
+		}
+		dir := GetFirstDirectory(item.URL)
+		if stats, ok := i.DirStats[dir]; ok {
+			stats.Size += item.Size
+			stats.Requests++
+		} else {
+			i.DirStats[dir] = &DirectoryStats{
+				Size:     item.Size,
+				Requests: 1,
+			}
 		}
 	}
 
@@ -233,13 +235,17 @@ func NewAnalyzer(c AnalyzerConfig) (*Analyzer, error) {
 		logger.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
 	}
 
-	return &Analyzer{
+	a := &Analyzer{
 		Config:    c,
 		stats:     make(map[StatKey]IPStats),
 		logParser: logParser,
 		logger:    logger,
 		bar:       progressbar.Default(-1, "analyzing"),
-	}, nil
+	}
+	if c.DirAnalyze {
+		a.dirStats = make(map[string]*DirectoryTotalStats)
+	}
+	return a, nil
 }
 
 func (a *Analyzer) RunLoop(iter fileiter.Iterator) error {
@@ -365,7 +371,7 @@ func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
 	}
 
 	updateStats := func(key StatKey) {
-		a.stats[key] = a.stats[key].UpdateWith(logItem)
+		a.stats[key] = a.stats[key].UpdateWith(logItem, a.Config.DirAnalyze)
 	}
 
 	if a.Config.Analyze || a.Config.Daemon {
@@ -399,31 +405,29 @@ func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
 		a.stats[StatKey{a.Config.Server, clientPrefix}] = ipStats
 	}
 
-	if a.dirStats == nil {
-		a.dirStats = make(map[string]*DirectoryTotalStats)
-	}
-
-	dir := GetFirstDirectory(logItem.URL)
-	if stats, ok := a.dirStats[dir]; ok {
-		stats.Size += logItem.Size
-		stats.Requests++
-		if stats.IPCount == nil {
-			stats.IPCount = make(map[netip.Prefix]struct{})
-		}
-		stats.IPCount[clientPrefix] = struct{}{}
-		if logItem.Time.After(stats.LastURLAccess) {
-			stats.LastURLUpdate = logItem.Time
-			stats.LastURLAccess = logItem.Time
-		}
-	} else {
-		ipCount := make(map[netip.Prefix]struct{})
-		ipCount[clientPrefix] = struct{}{}
-		a.dirStats[dir] = &DirectoryTotalStats{
-			Size:          logItem.Size,
-			Requests:      1,
-			IPCount:       ipCount,
-			LastURLUpdate: logItem.Time,
-			LastURLAccess: logItem.Time,
+	if a.Config.DirAnalyze {
+		dir := GetFirstDirectory(logItem.URL)
+		if stats, ok := a.dirStats[dir]; ok {
+			stats.Size += logItem.Size
+			stats.Requests++
+			if stats.IPCount == nil {
+				stats.IPCount = make(map[netip.Prefix]struct{})
+			}
+			stats.IPCount[clientPrefix] = struct{}{}
+			if logItem.Time.After(stats.LastURLAccess) {
+				stats.LastURLUpdate = logItem.Time
+				stats.LastURLAccess = logItem.Time
+			}
+		} else {
+			ipCount := make(map[netip.Prefix]struct{})
+			ipCount[clientPrefix] = struct{}{}
+			a.dirStats[dir] = &DirectoryTotalStats{
+				Size:          logItem.Size,
+				Requests:      1,
+				IPCount:       ipCount,
+				LastURLUpdate: logItem.Time,
+				LastURLAccess: logItem.Time,
+			}
 		}
 	}
 
