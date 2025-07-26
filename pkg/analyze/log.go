@@ -1,7 +1,6 @@
 package analyze
 
 import (
-	"log"
 	"os"
 )
 
@@ -14,6 +13,6 @@ func (a *Analyzer) OpenLogFile() error {
 	if err != nil {
 		return err
 	}
-	log.SetOutput(logFile)
+	a.logger.SetOutput(logFile)
 	return nil
 }
