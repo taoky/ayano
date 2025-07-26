@@ -229,14 +229,6 @@ func NewAnalyzer(c AnalyzerConfig) (*Analyzer, error) {
 	}
 
 	logger := log.New(os.Stdout, "", log.LstdFlags)
-	if c.LogOutput != "" {
-		f, err := os.OpenFile(c.LogOutput, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			return nil, fmt.Errorf("open log file error: %w", err)
-		}
-		c.LogOutput = f.Name()
-		logger.SetOutput(f)
-	}
 	if c.Analyze {
 		logger.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
 	}
@@ -247,6 +239,10 @@ func NewAnalyzer(c AnalyzerConfig) (*Analyzer, error) {
 		logParser: logParser,
 		logger:    logger,
 		bar:       progressbar.Default(-1, "analyzing"),
+	}
+	err = a.OpenLogFile()
+	if err != nil {
+		return nil, fmt.Errorf("open log file error: %w", err)
 	}
 	if c.DirAnalyze {
 		a.dirStats = make(map[string]*DirectoryTotalStats)
