@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/netip"
 	"os"
@@ -21,6 +20,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/taoky/ayano/pkg/fileiter"
 	"github.com/taoky/ayano/pkg/parser"
+	"github.com/taoky/ayano/pkg/util"
 )
 
 const TimeFormat = time.DateTime
@@ -318,13 +318,11 @@ func (a *Analyzer) RunLoopWithMultipleIterators(iters []fileiter.Iterator) error
 }
 
 func (a *Analyzer) AnalyzeFile(filename string) error {
-	f, err := OpenFile(filename)
+	f, err := util.OpenFile(filename)
 	if err != nil {
 		return err
 	}
-	if closer, ok := f.(io.Closer); ok {
-		defer closer.Close()
-	}
+	defer f.Close()
 	return a.RunLoop(fileiter.NewWithScanner(f))
 }
 
