@@ -221,7 +221,7 @@ func DefaultConfig() AnalyzerConfig {
 func NewAnalyzer(c AnalyzerConfig) (*Analyzer, error) {
 	logParser, err := parser.GetParser(c.Parser)
 	if err != nil {
-		return nil, fmt.Errorf("invalid parser: %w", err)
+		return nil, err
 	}
 
 	if c.Analyze {

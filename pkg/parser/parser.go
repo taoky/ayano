@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"errors"
 	"time"
 )
 
@@ -44,10 +43,16 @@ func RegisterParser(m ParserMeta) {
 	registry[m.Name] = m
 }
 
+type InvalidParserError string
+
+func (err InvalidParserError) Error() string {
+	return "invalid parser: " + string(err)
+}
+
 func GetParser(name string) (Parser, error) {
 	m, ok := registry[name]
 	if !ok {
-		return nil, errors.New(name)
+		return nil, InvalidParserError(name)
 	}
 	return m.F(), nil
 }

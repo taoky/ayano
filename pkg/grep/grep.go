@@ -39,7 +39,7 @@ func (c *GrepperConfig) InstallFlags(flags *pflag.FlagSet) {
 func New(c GrepperConfig, w io.Writer) (*Grepper, error) {
 	p, err := parser.GetParser(c.Parser)
 	if err != nil {
-		return nil, fmt.Errorf("invalid parser: %w", err)
+		return nil, err
 	}
 	g := &Grepper{
 		f:   c.f,
