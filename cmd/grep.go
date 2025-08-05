@@ -10,7 +10,7 @@ import (
 
 func grepCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "grep [filename...}",
+		Use:   "grep [filename...]",
 		Short: "Filter log",
 	}
 	config := grep.DefaultConfig()

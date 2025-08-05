@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 
 	"github.com/spf13/pflag"
 	"github.com/taoky/ayano/pkg/fileiter"
@@ -19,8 +20,10 @@ type Grepper struct {
 }
 
 type GrepperConfig struct {
-	f      *Filter
+	f *Filter
+
 	Parser string
+	Output string
 }
 
 func DefaultConfig() GrepperConfig {
@@ -33,6 +36,7 @@ func DefaultConfig() GrepperConfig {
 func (c *GrepperConfig) InstallFlags(flags *pflag.FlagSet) {
 	c.f.InstallFlags(flags)
 
+	flags.StringVarP(&c.Output, "output", "o", c.Output, "Output file name")
 	flags.StringVarP(&c.Parser, "parser", "p", c.Parser, "Log parser (see \"ayano list parsers\")")
 }
 
@@ -41,6 +45,14 @@ func New(c GrepperConfig, w io.Writer) (*Grepper, error) {
 	if err != nil {
 		return nil, err
 	}
+	if c.Output != "" {
+		f, err := os.Create(c.Output)
+		if err != nil {
+			return nil, err
+		}
+		w = f
+	}
+
 	g := &Grepper{
 		f:   c.f,
 		p:   p,

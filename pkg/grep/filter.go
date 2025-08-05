@@ -14,14 +14,15 @@ type Filter struct {
 }
 
 func (f *Filter) InstallFlags(flags *pflag.FlagSet) {
-	flags.Func("ip", "IP or CIDR range", func(value string) error {
-		p, err := netip.ParsePrefix(value)
-		if err != nil {
-			return err
-		}
-		f.Prefixes = append(f.Prefixes, p)
-		return nil
-	})
+	flags.Func("ip", "IP or CIDR range (can be specified multiple times)",
+		func(value string) error {
+			p, err := netip.ParsePrefix(value)
+			if err != nil {
+				return err
+			}
+			f.Prefixes = append(f.Prefixes, p)
+			return nil
+		})
 }
 
 func (f *Filter) IsEmpty() bool {
