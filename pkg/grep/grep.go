@@ -49,6 +49,10 @@ func New(c GrepperConfig, w io.Writer) (*Grepper, error) {
 	return g, nil
 }
 
+func (g *Grepper) IsEmpty() bool {
+	return g.f.IsEmpty()
+}
+
 func (g *Grepper) RunLoop(iter fileiter.Iterator) error {
 	for {
 		line, err := iter.Next()

@@ -1,7 +1,13 @@
 package main
 
-import "github.com/taoky/ayano/cmd"
+import (
+	"os"
+
+	"github.com/taoky/ayano/cmd"
+)
 
 func main() {
-	cmd.RootCmd().Execute()
+	if cmd.RootCmd().Execute() != nil {
+		os.Exit(1)
+	}
 }

@@ -24,6 +24,10 @@ func (f *Filter) InstallFlags(flags *pflag.FlagSet) {
 	})
 }
 
+func (f *Filter) IsEmpty() bool {
+	return len(f.Prefixes) == 0
+}
+
 var (
 	ErrInvalidIP     = errors.New("invalid client IP")
 	ErrNoPrefixMatch = errors.New("no matching prefix")
