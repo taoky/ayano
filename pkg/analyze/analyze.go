@@ -720,6 +720,9 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		table.Rich(row, rowColors)
 	}
 	table.Render()
+	if !a.bar.IsFinished() {
+		a.logger.Writer().Write([]byte{'\n'})
+	}
 	a.logger.Writer().Write(tableBuf.Bytes())
 }
 
