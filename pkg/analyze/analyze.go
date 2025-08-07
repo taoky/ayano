@@ -486,6 +486,7 @@ func (a *Analyzer) SortedKeys(sortBy SortByFlag, serverFilter string) []StatKey 
 	}
 	return keys
 }
+
 func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag, serverFilter string) {
 	if a.Config.UseLock() {
 		a.mu.Lock()
