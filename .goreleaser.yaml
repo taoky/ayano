@@ -38,6 +38,31 @@ snapshot:
 changelog:
   use: github-native
 
+nfpms:
+  - id: default
+    package_name: ayano
+    homepage: https://github.com/taoky/ayano
+    maintainer: "taoky <me@taoky.moe>"
+    description: |-
+      A simple log analysis tool for Nginx, Apache, or other web server logs
+    formats:
+      - deb
+    umask: 0o022
+    section: utils
+    priority: extra
+    provides:
+      - ayano
+    scripts:
+      postinstall: ./assets/postinst.sh
+      preremove: ./assets/prerm.sh
+    contents:
+      - src: ./assets/ayano-logrotate
+        dst: /etc/logrotate.d/
+      - src: ./assets/ayano.service
+        dst: /lib/systemd/system/
+      - src: ./assets/fail2ban/filter.d/ayano.conf
+        dst: /etc/fail2ban/filter.d/
+
 # modelines, feel free to remove those if you don't want/use them:
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # vim: set ts=2 sw=2 tw=0 fo=cnqoj
