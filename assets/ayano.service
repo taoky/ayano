@@ -1,5 +1,6 @@
 [Unit]
 Description=Nginx log analyzer for OSS mirrors, working with fail2ban
+After=network.target network-online.target
 
 [Service]
 Restart=on-failure
