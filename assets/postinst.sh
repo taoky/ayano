@@ -20,7 +20,7 @@ if [ "$1" = "configure" ]; then
 	# Add log directory with correct permissions
 	if [ ! -d /var/log/ayano ]; then
 		mkdir -p /var/log/ayano
-		chown -R ayano:nobody /var/log/ayano
+		chown -R ayano:nogroup /var/log/ayano
 	fi
 fi
 
