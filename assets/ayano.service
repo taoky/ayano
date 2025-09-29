@@ -6,17 +6,16 @@ After=network.target network-online.target
 Restart=on-failure
 StartLimitInterval=10s
 MemoryMax=5G
-ExecStart=/usr/local/bin/ayano daemon --outlog /var/log/ayano/record.log --parser nginx-combined /var/log/nginx/access.log
+
+# You may need to modify this with "systemctl edit ayano.service"
+ExecStart=/usr/bin/ayano daemon --outlog /var/log/ayano/record.log --parser nginx-combined /var/log/nginx/access.log
 
 Type=notify-reload
 ExecReload=/bin/kill -HUP $MAINPID
 
 LogsDirectory=ayano
-# Run `adduser --system ayano` first!
 User=ayano
 Group=nogroup
-# The group of /var/log/nginx
-SupplementaryGroups=adm
 
 [Install]
 WantedBy=multi-user.target

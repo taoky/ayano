@@ -55,9 +55,13 @@ nfpms:
     scripts:
       postinstall: ./assets/postinst.sh
       preremove: ./assets/prerm.sh
+      postremove: ./assets/postrm.sh
     contents:
+      - src: "./{{ .ProjectName }}-{{ .Os  }}-{{ .Arch }}{{ if .Amd64 }}-{{ .Amd64 }}{{ end }}"
+        dst: /usr/bin/ayano
+        type: symlink
       - src: ./assets/ayano-logrotate
-        dst: /etc/logrotate.d/
+        dst: /etc/logrotate.d/ayano
       - src: ./assets/ayano.service
         dst: /lib/systemd/system/
       - src: ./assets/fail2ban/filter.d/ayano.conf

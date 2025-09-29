@@ -1,6 +1,9 @@
 #!/bin/sh
+# Modified from https://github.com/caddyserver/dist/blob/master/scripts/preremove.sh
+# Apache License 2.0
 
-# Only run if systemd is running
-[ -d /run/systemd ] || exit 0
+set -e
 
-systemctl disable --now ayano.service
+if [ -d /run/systemd/system ] && [ "$1" = remove ]; then
+	deb-systemd-invoke stop ayano.service >/dev/null || true
+fi
