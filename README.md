@@ -8,6 +8,23 @@ Follow nginx log, and find out bad guys! Ayano parses web server log and shows c
 CGO_ENABLED=0 go build
 ```
 
+## Install
+
+You could use the deb package provided in [Releases](https://github.com/taoky/ayano/releases). It provides:
+
+- `/usr/bin/ayano`
+- A systemd service file at `/lib/systemd/system/ayano.service`
+- A logrotate config file at `/etc/logrotate.d/ayano`
+- A fail2ban filter file at `/etc/fail2ban/filter.d/ayano.conf`
+
+You might need to customize `/lib/systemd/system/ayano.service` to fit your need (especially the `ExecStart=` line) like this with `systemctl edit ayano.service`:
+
+```ini
+[Service]
+ExecStart=
+ExecStart=/usr/bin/ayano daemon ...
+```
+
 ## Usage
 
 ```console
