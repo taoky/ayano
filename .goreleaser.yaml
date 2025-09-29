@@ -26,14 +26,14 @@ builds:
     no_unique_dist_dir: true
 
 archives:
-  - format: binary
+  - formats: [ 'binary' ]
     name_template: "{{ .Binary }}"
 
 checksum:
   name_template: 'checksums.txt'
 
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
 
 changelog:
   use: github-native
