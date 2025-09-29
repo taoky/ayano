@@ -233,12 +233,19 @@ func NewAnalyzer(c AnalyzerConfig) (*Analyzer, error) {
 		logger.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
 	}
 
+	var bar *progressbar.ProgressBar
+	if !c.Daemon {
+		bar = progressbar.Default(-1, "analyzing")
+	} else {
+		bar = progressbar.DefaultSilent(-1, "analyzing")
+	}
+
 	a := &Analyzer{
 		Config:    c,
 		stats:     make(map[StatKey]IPStats),
 		logParser: logParser,
 		logger:    logger,
-		bar:       progressbar.Default(-1, "analyzing"),
+		bar:       bar,
 	}
 	err = a.OpenLogFile()
 	if err != nil {
