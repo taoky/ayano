@@ -28,6 +28,7 @@ const TimeFormat = time.DateTime
 var (
 	tableColorNone = tablewriter.Colors{tablewriter.Normal}
 	tableColorBold = tablewriter.Colors{tablewriter.Bold}
+	tableColorRed  = tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiRedColor}
 )
 
 type UAKeyType = unique.Handle[string]
@@ -154,6 +155,7 @@ type AnalyzerConfig struct {
 	PrefixV6   int
 	PrintDelta SizeFlag
 	RefreshSec int
+	RepeatWarn time.Duration
 	Server     string
 	SortBy     SortByFlag
 	Threshold  SizeFlag
@@ -177,6 +179,7 @@ func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet, cmdname string) {
 	flags.StringVarP(&c.Parser, "parser", "p", c.Parser, "Log parser (see \"ayano list parsers\")")
 	flags.IntVar(&c.PrefixV4, "prefixv4", c.PrefixV4, "Group IPv4 by prefix")
 	flags.IntVar(&c.PrefixV6, "prefixv6", c.PrefixV6, "Group IPv6 by prefix")
+	flags.DurationVar(&c.RepeatWarn, "repeat-warn", c.RepeatWarn, "Highlight repeated URL visits longer than duration")
 	flags.IntVarP(&c.RefreshSec, "refresh", "r", c.RefreshSec, "Refresh interval in seconds")
 	flags.StringVarP(&c.Server, "server", "s", c.Server, "Server IP to filter (nginx-json only)")
 	flags.VarP(&c.SortBy, "sort-by", "S", "Sort result by (size|requests)")
@@ -269,7 +272,6 @@ func (a *Analyzer) RunLoop(iter fileiter.Iterator) error {
 			break
 		}
 		if err := a.handleLine(line); err != nil {
-			// TODO: replace with logger
 			a.logger.Printf("analyze error: %v", err)
 		}
 	}
@@ -693,6 +695,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 			lastUpdateTime = HumanizeAgo(now.Sub(ipStats.LastURLUpdate))
 			lastAccessTime = HumanizeAgo(now.Sub(ipStats.LastURLAccess))
 		}
+		isRepeatedVisit := a.Config.RepeatWarn != 0 && ipStats.LastURLAccess.Sub(ipStats.LastURLUpdate) >= a.Config.RepeatWarn
 
 		average := total / uint64(reqTotal)
 		boldLine := false
@@ -708,10 +711,15 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		}
 		rowColors := slices.Repeat([]tablewriter.Colors{tableColorNone}, len(row))
 		if boldLine {
+			// Bold entire line
 			rowColors = slices.Repeat([]tablewriter.Colors{tableColorBold}, len(row))
 		} else {
 			// Bold color for 2nd column (connections)
 			rowColors[1] = tableColorBold
+		}
+		if isRepeatedVisit {
+			// Bold+Red color for 8th column (lastAccessTime)
+			rowColors[7] = tableColorRed
 		}
 
 		if !a.Config.NoNetstat {
