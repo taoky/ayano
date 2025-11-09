@@ -3,6 +3,9 @@ package analyze
 import (
 	"os"
 	"testing"
+
+	"github.com/taoky/ayano/pkg/grep"
+	"github.com/taoky/ayano/pkg/util"
 )
 
 func benchmarkAnalyzeLoop(b *testing.B, parserStr string) {
@@ -11,12 +14,13 @@ func benchmarkAnalyzeLoop(b *testing.B, parserStr string) {
 	if logPath == "" {
 		b.Fatal("LOG_PATH is not set")
 	}
+	filter := grep.Filter{}
+	filter.Threshold = util.SizeFlag(100 * (1 << 20))
 	c := AnalyzerConfig{
 		NoNetstat:  true,
 		Parser:     parserStr,
-		Server:     "",
 		RefreshSec: 5,
-		Threshold:  100 * (1 << 20),
+		Filter:     filter,
 		TopN:       20,
 		Whole:      true,
 
