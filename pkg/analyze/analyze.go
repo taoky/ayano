@@ -19,6 +19,7 @@ import (
 	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/pflag"
 	"github.com/taoky/ayano/pkg/fileiter"
+	"github.com/taoky/ayano/pkg/grep"
 	"github.com/taoky/ayano/pkg/parser"
 	"github.com/taoky/ayano/pkg/util"
 )
@@ -153,16 +154,15 @@ type AnalyzerConfig struct {
 	Parser     string
 	PrefixV4   int
 	PrefixV6   int
-	PrintDelta SizeFlag
+	PrintDelta util.SizeFlag
 	RefreshSec int
 	RepeatWarn time.Duration
-	Server     string
 	SortBy     SortByFlag
-	Threshold  SizeFlag
 	TopN       int
 	Truncate   bool
 	Truncate2  int
 	Whole      bool
+	Filter     grep.Filter
 
 	Analyze    bool
 	Daemon     bool
@@ -181,12 +181,12 @@ func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet, cmdname string) {
 	flags.IntVar(&c.PrefixV6, "prefixv6", c.PrefixV6, "Group IPv6 by prefix")
 	flags.DurationVar(&c.RepeatWarn, "repeat-warn", c.RepeatWarn, "Highlight repeated URL visits longer than duration")
 	flags.IntVarP(&c.RefreshSec, "refresh", "r", c.RefreshSec, "Refresh interval in seconds")
-	flags.StringVarP(&c.Server, "server", "s", c.Server, "Server IP to filter (nginx-json only)")
 	flags.VarP(&c.SortBy, "sort-by", "S", "Sort result by (size|requests)")
-	flags.VarP(&c.Threshold, "threshold", "t", "Threshold size for request (only requests at least this large will be counted)")
 	flags.IntVarP(&c.TopN, "top", "n", c.TopN, "Number of top items to show")
 	flags.BoolVar(&c.Truncate, "truncate", c.Truncate, "Truncate long URLs from output")
 	flags.IntVar(&c.Truncate2, "truncate-to", c.Truncate2, "Truncate URLs to given length, overrides --truncate")
+
+	c.Filter.InstallFlags(flags)
 
 	flags.StringVar(&c.CpuProfile, "cpuprof", c.CpuProfile, "Write CPU profiling information")
 	flags.StringVar(&c.MemProfile, "memprof", c.MemProfile, "Write memory profiling information")
@@ -209,14 +209,16 @@ func (c *AnalyzerConfig) UseLock() bool {
 }
 
 func DefaultConfig() AnalyzerConfig {
+	filter := grep.Filter{}
+	filter.Threshold = util.SizeFlag(10e6)
 	return AnalyzerConfig{
 		Parser:     "nginx-json",
 		PrefixV4:   24,
 		PrefixV6:   48,
-		PrintDelta: SizeFlag(1e9),
+		PrintDelta: util.SizeFlag(1e9),
 		RefreshSec: 5,
 		SortBy:     SortBySize,
-		Threshold:  SizeFlag(10e6),
+		Filter:     filter,
 		TopN:       10,
 	}
 }
@@ -357,14 +359,8 @@ func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
 		return nil
 	}
 
-	// Filter by server
-	if a.Config.Server != "" && logItem.Server != a.Config.Server {
-		return nil
-	}
-
-	// Filter by sent size
-	size := logItem.Size
-	if size < uint64(a.Config.Threshold) {
+	// Filter
+	if err := a.Config.Filter.Match(logItem); err != nil {
 		return nil
 	}
 
@@ -385,7 +381,7 @@ func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
 
 	if a.Config.Analyze || a.Config.Daemon {
 		// Avoid using double memory when not in interactive mode
-		updateStats(StatKey{a.Config.Server, clientPrefix})
+		updateStats(StatKey{a.Config.Filter.Server, clientPrefix})
 	} else {
 		updateStats(StatKey{logItem.Server, clientPrefix})
 
@@ -396,7 +392,7 @@ func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
 	}
 
 	if a.Config.Daemon {
-		ipStats := a.stats[StatKey{a.Config.Server, clientPrefix}]
+		ipStats := a.stats[StatKey{a.Config.Filter.Server, clientPrefix}]
 		delta := ipStats.Size - ipStats.LastSize
 		if ipStats.LastSize == 0 {
 			ipStats.FirstSeen = logItem.Time
@@ -410,8 +406,8 @@ func (a *Analyzer) handleLogItem(logItem parser.LogItem) error {
 				logItem.URL)
 		}
 		ipStats.LastSize += printTimes * uint64(a.Config.PrintDelta)
-		// Just update [StatKey{a.Config.Server, clientPrefix}] here, as the config would not be updated runtime now
-		a.stats[StatKey{a.Config.Server, clientPrefix}] = ipStats
+		// Just update [StatKey{a.Config.Filter.Server, clientPrefix}] here, as the config would not be updated runtime now
+		a.stats[StatKey{a.Config.Filter.Server, clientPrefix}] = ipStats
 	}
 
 	if a.Config.DirAnalyze {
