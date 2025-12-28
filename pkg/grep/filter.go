@@ -15,6 +15,7 @@ import (
 type Filter struct {
 	Prefixes    []netip.Prefix
 	UrlContains []string
+	UAContains  []string
 	TimeFrom    time.Time
 	TimeTo      time.Time
 	Threshold   util.SizeFlag
@@ -39,6 +40,7 @@ func (f *Filter) InstallFlags(flags *pflag.FlagSet) {
 			return nil
 		})
 	flags.StringArrayVar(&f.UrlContains, "url-contains", f.UrlContains, "URL substring to filter (can be specified multiple times)")
+	flags.StringArrayVar(&f.UAContains, "ua-contains", f.UAContains, "User-Agent substring to filter (can be specified multiple times)")
 	flags.TimeVar(&f.TimeFrom, "time-from", f.TimeFrom, timeFormats, "Start time to filter (inclusive). Default value (zero) means no limit")
 	flags.TimeVar(&f.TimeTo, "time-to", f.TimeTo, timeFormats, "End time to filter (inclusive). Default value (zero) means no limit")
 	flags.VarP(&f.Threshold, "threshold", "t", "Threshold size for request (only requests at least this large will be counted)")
@@ -46,13 +48,14 @@ func (f *Filter) InstallFlags(flags *pflag.FlagSet) {
 }
 
 func (f *Filter) IsEmpty() bool {
-	return len(f.Prefixes) == 0 && len(f.UrlContains) == 0 && f.TimeFrom.IsZero() && f.TimeTo.IsZero() && f.Threshold == 0 && f.Server == ""
+	return len(f.Prefixes) == 0 && len(f.UrlContains) == 0 && len(f.UAContains) == 0 && f.TimeFrom.IsZero() && f.TimeTo.IsZero() && f.Threshold == 0 && f.Server == ""
 }
 
 var (
 	ErrInvalidIP     = errors.New("invalid client IP")
 	ErrNoPrefixMatch = errors.New("no matching prefix")
 	ErrURLNoMatch    = errors.New("URL does not match")
+	ErrUANoMatch     = errors.New("User-Agent does not match")
 	ErrTimeNoMatch   = errors.New("time does not match")
 	ErrSizeTooSmall  = errors.New("size below threshold")
 	ErrServerNoMatch = errors.New("server does not match")
@@ -85,6 +88,18 @@ func (f *Filter) Match(item parser.LogItem) error {
 		}
 		if !urlMatch {
 			return ErrURLNoMatch
+		}
+	}
+	if len(f.UAContains) > 0 {
+		uaMatch := false
+		for _, substr := range f.UAContains {
+			if strings.Contains(item.Useragent, substr) {
+				uaMatch = true
+				break
+			}
+		}
+		if !uaMatch {
+			return ErrUANoMatch
 		}
 	}
 	if !f.TimeFrom.IsZero() {
