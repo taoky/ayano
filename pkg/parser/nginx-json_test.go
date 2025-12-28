@@ -16,6 +16,7 @@ func TestNginxJsonParser(t *testing.T) {
 	as.EqualValues(3009, log.Size)
 	as.Equal("123.45.67.8", log.Client)
 	as.Equal("/path/to/a/file", log.URL)
+	as.Equal("87.65.4.32", log.Server)
 	expectedTime := time.Unix(1678551332, 293000000)
 	as.WithinDuration(expectedTime, log.Time, time.Microsecond)
 	as.Equal("", log.Useragent)

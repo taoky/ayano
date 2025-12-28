@@ -575,6 +575,10 @@ func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy S
 }
 
 func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag, serverFilter string) {
+	if serverFilter == "" {
+		serverFilter = a.Config.Filter.Server
+	}
+
 	activeConn := make(map[netip.Prefix]int)
 	if !a.Config.NoNetstat {
 		a.GetActiveConns(activeConn)
