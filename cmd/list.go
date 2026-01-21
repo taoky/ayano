@@ -38,10 +38,8 @@ func listParsersCmd() *cobra.Command {
 			// Header and rows are left-aligned.
 			tablewriter.WithHeaderAlignment(tw.AlignLeft),
 			tablewriter.WithRowAlignment(tw.AlignLeft),
-			// Preserve whitespace and use two-space padding between columns.
-			tablewriter.WithTrimSpace(tw.Off),
+			// Use two-space padding between columns.
 			tablewriter.WithPadding(tw.Padding{
-				Left:      "  ",
 				Right:     "  ",
 				Overwrite: true,
 			}),

@@ -528,9 +528,7 @@ func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy S
 	table := tablewriter.NewTable(
 		tableBuf,
 		tablewriter.WithHeaderAutoFormat(tw.Off),
-		tablewriter.WithTrimSpace(tw.Off),
 		tablewriter.WithPadding(tw.Padding{
-			Left:      "  ",
 			Right:     "  ",
 			Overwrite: true,
 		}),
@@ -724,9 +722,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 			Border:    renderer.Tint{Columns: []renderer.Tint{}},
 			Separator: renderer.Tint{Columns: []renderer.Tint{}},
 		})),
-		tablewriter.WithTrimSpace(tw.Off),
 		tablewriter.WithPadding(tw.Padding{
-			Left:      "  ",
 			Right:     "  ",
 			Overwrite: true,
 		}),
