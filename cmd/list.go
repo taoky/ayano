@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/olekukonko/tablewriter"
+	"github.com/olekukonko/tablewriter/tw"
 	"github.com/spf13/cobra"
 	"github.com/taoky/ayano/pkg/parser"
 )
@@ -29,21 +30,32 @@ func listParsersCmd() *cobra.Command {
 	var all bool
 	cmd.Flags().BoolVarP(&all, "all", "a", false, "Show all parsers")
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		table := tablewriter.NewWriter(cmd.OutOrStdout())
-		table.SetAutoWrapText(false)
-		table.SetAutoFormatHeaders(true)
-		table.SetCenterSeparator("")
-		table.SetColumnSeparator("")
-		table.SetRowLine(false)
-		table.SetRowSeparator("")
-		table.SetTablePadding("  ")
-		table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-		table.SetAlignment(tablewriter.ALIGN_LEFT)
-		table.SetHeaderLine(false)
-		table.SetBorder(false)
-		table.SetNoWhiteSpace(true)
+		table := tablewriter.NewTable(
+			cmd.OutOrStdout(),
+			// Disable wrapping for both header and rows to match legacy behavior.
+			tablewriter.WithHeaderAutoWrap(tw.WrapNone),
+			tablewriter.WithRowAutoWrap(tw.WrapNone),
+			// Header and rows are left-aligned.
+			tablewriter.WithHeaderAlignment(tw.AlignLeft),
+			tablewriter.WithRowAlignment(tw.AlignLeft),
+			// Preserve whitespace and use two-space padding between columns.
+			tablewriter.WithTrimSpace(tw.Off),
+			tablewriter.WithPadding(tw.Padding{
+				Left:      "  ",
+				Right:     "  ",
+				Overwrite: true,
+			}),
+			// No borders or header/row separator lines.
+			tablewriter.WithRendition(tw.Rendition{
+				Borders: tw.BorderNone,
+				Settings: tw.Settings{
+					Lines:      tw.LinesNone,
+					Separators: tw.SeparatorsNone,
+				},
+			}),
+		)
 
-		table.SetHeader([]string{"Name", "Description"})
+		table.Header("Name", "Description")
 
 		parsers := parser.All()
 		slices.SortFunc(parsers, func(a, b parser.ParserMeta) int {
@@ -51,10 +63,14 @@ func listParsersCmd() *cobra.Command {
 		})
 		for _, p := range parsers {
 			if all || !p.Hidden {
-				table.Append([]string{p.Name, p.Description})
+				if err := table.Append([]string{p.Name, p.Description}); err != nil {
+					return err
+				}
 			}
 		}
-		table.Render()
+		if err := table.Render(); err != nil {
+			return err
+		}
 		return nil
 	}
 	return cmd

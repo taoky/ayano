@@ -15,7 +15,10 @@ import (
 
 	"github.com/cakturk/go-netstat/netstat"
 	"github.com/dustin/go-humanize"
+	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
+	"github.com/olekukonko/tablewriter/renderer"
+	"github.com/olekukonko/tablewriter/tw"
 	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/pflag"
 	"github.com/taoky/ayano/pkg/fileiter"
@@ -25,12 +28,6 @@ import (
 )
 
 const TimeFormat = time.DateTime
-
-var (
-	tableColorNone = tablewriter.Colors{tablewriter.Normal}
-	tableColorBold = tablewriter.Colors{tablewriter.Bold}
-	tableColorRed  = tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiRedColor}
-)
 
 type UAKeyType = unique.Handle[string]
 
@@ -518,28 +515,36 @@ func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy S
 		})
 	}
 	tableBuf := new(bytes.Buffer)
-	table := tablewriter.NewWriter(tableBuf)
-	table.SetCenterSeparator("  ")
-	table.SetColumnSeparator("")
-	table.SetRowSeparator("")
-	table.SetTablePadding("  ")
-	table.SetAutoFormatHeaders(false)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetNoWhiteSpace(true)
 
-	// Set table header
-	table.SetHeader([]string{"Directory", "Size", "Requests", "Avg Size", "IPs", "Last Access"})
-	table.SetColumnAlignment([]int{
-		tablewriter.ALIGN_LEFT,  // Directory
-		tablewriter.ALIGN_RIGHT, // Size
-		tablewriter.ALIGN_RIGHT, // Requests
-		tablewriter.ALIGN_RIGHT, // Avg Size
-		tablewriter.ALIGN_RIGHT, // IPs
-		tablewriter.ALIGN_RIGHT, // Last Access
-	})
+	alignments := []tw.Align{
+		tw.AlignLeft,  // Directory
+		tw.AlignRight, // Size
+		tw.AlignRight, // Requests
+		tw.AlignRight, // Avg Size
+		tw.AlignRight, // IPs
+		tw.AlignRight, // Last Access
+	}
+
+	table := tablewriter.NewTable(
+		tableBuf,
+		tablewriter.WithHeaderAutoFormat(tw.Off),
+		tablewriter.WithTrimSpace(tw.Off),
+		tablewriter.WithPadding(tw.Padding{
+			Left:      "  ",
+			Right:     "  ",
+			Overwrite: true,
+		}),
+		tablewriter.WithRendition(tw.Rendition{
+			Borders: tw.BorderNone,
+			Settings: tw.Settings{
+				Lines:      tw.LinesNone,
+				Separators: tw.SeparatorsNone,
+			},
+		}),
+		tablewriter.WithAlignment(tw.Alignment(alignments)),
+	)
+
+	table.Header("Directory", "Size", "Requests", "Avg Size", "IPs", "Last Access")
 
 	// Show top N directories
 	top := a.Config.TopN
@@ -567,11 +572,16 @@ func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy S
 			lastAccess,
 		}
 
-		table.Append(row)
+		if err := table.Append(row); err != nil {
+			a.logger.Printf("failed to append directory row: %v", err)
+		}
 	}
 
-	table.Render()
-	a.logger.Writer().Write(tableBuf.Bytes())
+	if err := table.Render(); err != nil {
+		a.logger.Printf("failed to render directory table: %v", err)
+	} else {
+		a.logger.Writer().Write(tableBuf.Bytes())
+	}
 }
 
 func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag, serverFilter string) {
@@ -643,35 +653,89 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 	}
 
 	tableBuf := new(bytes.Buffer)
-	table := tablewriter.NewWriter(tableBuf)
-	table.SetCenterSeparator("  ")
-	table.SetColumnSeparator("")
-	table.SetRowSeparator("")
-	table.SetTablePadding("  ")
-	table.SetAutoFormatHeaders(false)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetNoWhiteSpace(true)
-	tAlignment := []int{
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_DEFAULT,
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_RIGHT,
-		tablewriter.ALIGN_RIGHT,
+
+	alignments := []tw.Align{
+		tw.AlignRight,
+		tw.AlignRight,
+		tw.AlignRight,
+		tw.AlignRight,
+		tw.AlignRight,
+		tw.AlignDefault,
+		tw.AlignRight,
+		tw.AlignRight,
+		tw.AlignRight,
 	}
-	tHeaders := []string{"CIDR", "Conn", "Bytes", "Reqs", "Avg", "URL", "URL Since", "URL Last", "UA"}
+	headers := []string{"CIDR", "Conn", "Bytes", "Reqs", "Avg", "URL", "URL Since", "URL Last", "UA"}
 	if a.Config.NoNetstat {
-		tAlignment = append(tAlignment[:1], tAlignment[2:]...)
-		tHeaders = append(tHeaders[:1], tHeaders[2:]...)
+		alignments = append(alignments[:1], alignments[2:]...)
+		headers = append(headers[:1], headers[2:]...)
 	}
-	table.SetColumnAlignment(tAlignment)
-	table.SetHeader(tHeaders)
+
+	boldColor := color.New(color.Bold)
+	boldRedColor := color.New(color.Bold, color.FgHiRed)
+
+	type rowStyleInfo struct {
+		bold          bool
+		repeatedVisit bool
+	}
+
+	style := &rowStyleInfo{}
+	lastAccessColIdx := 7
+	if a.Config.NoNetstat {
+		lastAccessColIdx = 6
+	}
+
+	rowFilter := tw.CellFilter{
+		PerColumn: make([]func(string) string, len(alignments)),
+	}
+	for i := range alignments {
+		col := i
+		rowFilter.PerColumn[col] = func(s string) string {
+			if s == "" {
+				return s
+			}
+			if style.bold {
+				if style.repeatedVisit && col == lastAccessColIdx {
+					return boldRedColor.Sprint(s)
+				}
+				return boldColor.Sprint(s)
+			}
+			if style.repeatedVisit && col == lastAccessColIdx {
+				return boldRedColor.Sprint(s)
+			}
+			if !a.Config.NoNetstat && col == 1 {
+				return boldColor.Sprint(s)
+			}
+			return s
+		}
+	}
+
+	table := tablewriter.NewTable(
+		tableBuf,
+		tablewriter.WithRenderer(renderer.NewColorized(renderer.ColorizedConfig{
+			Borders: tw.BorderNone,
+			Settings: tw.Settings{
+				Lines:      tw.LinesNone,
+				Separators: tw.SeparatorsNone,
+			},
+			Header:    renderer.Tint{Columns: []renderer.Tint{}},
+			Column:    renderer.Tint{Columns: []renderer.Tint{}},
+			Footer:    renderer.Tint{Columns: []renderer.Tint{}},
+			Border:    renderer.Tint{Columns: []renderer.Tint{}},
+			Separator: renderer.Tint{Columns: []renderer.Tint{}},
+		})),
+		tablewriter.WithTrimSpace(tw.Off),
+		tablewriter.WithPadding(tw.Padding{
+			Left:      "  ",
+			Right:     "  ",
+			Overwrite: true,
+		}),
+		tablewriter.WithHeaderAutoFormat(tw.Off),
+		tablewriter.WithAlignment(tw.Alignment(alignments)),
+		tablewriter.WithRowFilter(rowFilter),
+	)
+
+	table.Header(headers)
 
 	now := time.Now()
 	for i := range top {
@@ -709,18 +773,6 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 			key.Prefix.String(), "", humanize.IBytes(total), strconv.FormatUint(reqTotal, 10),
 			humanize.IBytes(average), last, lastUpdateTime, lastAccessTime, strconv.Itoa(agents),
 		}
-		rowColors := slices.Repeat([]tablewriter.Colors{tableColorNone}, len(row))
-		if boldLine {
-			// Bold entire line
-			rowColors = slices.Repeat([]tablewriter.Colors{tableColorBold}, len(row))
-		} else {
-			// Bold color for 2nd column (connections)
-			rowColors[1] = tableColorBold
-		}
-		if isRepeatedVisit {
-			// Bold+Red color for 8th column (lastAccessTime)
-			rowColors[7] = tableColorRed
-		}
 
 		if !a.Config.NoNetstat {
 			if _, ok := activeConn[key.Prefix]; ok {
@@ -729,16 +781,23 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		} else {
 			// Remove connections column
 			row = append(row[:1], row[2:]...)
-			rowColors = append(rowColors[:1], rowColors[2:]...)
 		}
 
-		table.Rich(row, rowColors)
+		style.bold = boldLine
+		style.repeatedVisit = isRepeatedVisit
+
+		if err := table.Append(row); err != nil {
+			a.logger.Printf("failed to append top row: %v", err)
+		}
 	}
-	table.Render()
-	if !a.bar.IsFinished() {
-		a.logger.Writer().Write([]byte{'\n'})
+	if err := table.Render(); err != nil {
+		a.logger.Printf("failed to render top values table: %v", err)
+	} else {
+		if !a.bar.IsFinished() {
+			a.logger.Writer().Write([]byte{'\n'})
+		}
+		a.logger.Writer().Write(tableBuf.Bytes())
 	}
-	a.logger.Writer().Write(tableBuf.Bytes())
 }
 
 func (a *Analyzer) GetCurrentServers() []string {
