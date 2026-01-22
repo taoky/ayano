@@ -115,11 +115,7 @@ func runCmd() *cobra.Command {
 		Use:   "run [filename...]",
 		Short: "Run and follow the log file(s)",
 	}
-	config := analyze.DefaultConfig()
-	config.InstallFlags(cmd.Flags(), cmd.Name())
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		return runWithConfig(cmd, args, config)
-	}
+	setupAnalyzeCommand(cmd, cmd.Name())
 	return cmd
 }
 
@@ -144,8 +140,14 @@ func setupAnalyzeCommand(cmd *cobra.Command, cmdType string) (analyze.AnalyzerCo
 		switch cmdType {
 		case "analyze":
 			config.Analyze = true
+		case "daemon":
+			config.Daemon = true
 		case "dir-analyze":
 			config.DirAnalyze = true
+		case "run":
+			// nothing
+		default:
+			panic(fmt.Sprintf("unknown analyze mode: %s", cmdType))
 		}
 
 		return runWithConfig(cmd, args, config)
@@ -161,7 +163,7 @@ func analyzeCmd() *cobra.Command {
 		Aliases: []string{"analyse"},
 		Short:   "Log analyse mode (no tail following, only show top N at the end, and implies --whole)",
 	}
-	setupAnalyzeCommand(cmd, "analyze")
+	setupAnalyzeCommand(cmd, cmd.Name())
 	return cmd
 }
 
@@ -171,7 +173,7 @@ func dirAnalyzeCmd() *cobra.Command {
 		Aliases: []string{"dir-analyse"},
 		Short:   "Analyze log by directory (show statistics for each first-level directory)",
 	}
-	setupAnalyzeCommand(cmd, "dir-analyze")
+	setupAnalyzeCommand(cmd, cmd.Name())
 	return cmd
 }
 
@@ -181,11 +183,6 @@ func daemonCmd() *cobra.Command {
 		Short: "Daemon mode, prints out IP CIDR and total size every 1 GiB",
 		Args:  cobra.MaximumNArgs(1),
 	}
-	config := analyze.DefaultConfig()
-	config.InstallFlags(cmd.Flags(), cmd.Name())
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		config.Daemon = true
-		return runWithConfig(cmd, args, config)
-	}
+	setupAnalyzeCommand(cmd, cmd.Name())
 	return cmd
 }
