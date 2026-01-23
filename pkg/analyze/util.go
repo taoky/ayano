@@ -1,7 +1,6 @@
 package analyze
 
 import (
-	"errors"
 	"fmt"
 	"net/netip"
 	"path/filepath"
@@ -9,36 +8,6 @@ import (
 	"strings"
 	"time"
 )
-
-type SortByFlag string
-
-const (
-	SortBySize      SortByFlag = "size"
-	SortByRequests  SortByFlag = "requests"
-	SortByDirectory SortByFlag = "directory"
-)
-
-func (s SortByFlag) String() string {
-	return string(s)
-}
-
-func (s *SortByFlag) Set(value string) error {
-	switch value {
-	case "size":
-		*s = SortBySize
-	case "requests", "reqs":
-		*s = SortByRequests
-	case "directory", "dir":
-		*s = SortByDirectory
-	default:
-		return errors.New(`must be one of "size", "requests" or "directory"`)
-	}
-	return nil
-}
-
-func (s SortByFlag) Type() string {
-	return "string"
-}
 
 func GetFirstDirectory(url string) string {
 	if url == "" {

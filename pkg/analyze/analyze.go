@@ -692,14 +692,11 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 			if s == "" {
 				return s
 			}
-			if style.bold {
-				if style.repeatedVisit && col == lastAccessColIdx {
-					return boldRedColor.Sprint(s)
-				}
-				return boldColor.Sprint(s)
-			}
 			if style.repeatedVisit && col == lastAccessColIdx {
 				return boldRedColor.Sprint(s)
+			}
+			if style.bold {
+				return boldColor.Sprint(s)
 			}
 			if !a.Config.NoNetstat && col == 1 {
 				return boldColor.Sprint(s)
