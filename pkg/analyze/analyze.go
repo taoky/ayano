@@ -489,7 +489,7 @@ func (a *Analyzer) SortedKeys(sortBy SortByFlag, serverFilter string) []StatKey 
 	return keys
 }
 
-func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag, serverFilter string) {
+func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy SortByFlag) {
 	if a.Config.UseLock() {
 		a.mu.Lock()
 		defer a.mu.Unlock()
@@ -516,22 +516,17 @@ func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy S
 	}
 	tableBuf := new(bytes.Buffer)
 
-	alignments := []tw.Align{
-		tw.AlignLeft,  // Directory
-		tw.AlignRight, // Size
-		tw.AlignRight, // Requests
-		tw.AlignRight, // Avg Size
-		tw.AlignRight, // IPs
-		tw.AlignRight, // Last Access
+	alignments := tw.Alignment{
+		tw.AlignDefault, // Directory
+		tw.AlignRight,   // Size
+		tw.AlignRight,   // Requests
+		tw.AlignRight,   // Avg Size
+		tw.AlignRight,   // IPs
+		tw.AlignRight,   // Last Access
 	}
 
 	table := tablewriter.NewTable(
 		tableBuf,
-		tablewriter.WithHeaderAutoFormat(tw.Off),
-		tablewriter.WithPadding(tw.Padding{
-			Right:     "  ",
-			Overwrite: true,
-		}),
 		tablewriter.WithRendition(tw.Rendition{
 			Borders: tw.BorderNone,
 			Settings: tw.Settings{
@@ -539,7 +534,12 @@ func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy S
 				Separators: tw.SeparatorsNone,
 			},
 		}),
-		tablewriter.WithAlignment(tw.Alignment(alignments)),
+		tablewriter.WithPadding(tw.Padding{
+			Right:     "  ",
+			Overwrite: true,
+		}),
+		tablewriter.WithHeaderAutoFormat(tw.Off),
+		tablewriter.WithAlignment(alignments),
 	)
 
 	table.Header("Directory", "Size", "Requests", "Avg Size", "IPs", "Last Access")
@@ -551,12 +551,13 @@ func (a *Analyzer) DirAnalyze(displayRecord map[netip.Prefix]time.Time, sortBy S
 	}
 
 	// Add row data
+	now := time.Now()
 	for i := 0; i < top; i++ {
 		dir := dirs[i]
 		stats := dir.stats
 		avgSize := stats.Size / uint64(stats.Requests)
 
-		lastAccess := humanize.Time(stats.LastURLAccess)
+		lastAccess := HumanizeAgo(now.Sub(stats.LastURLAccess))
 		if a.Config.Absolute {
 			lastAccess = stats.LastURLAccess.Format(TimeFormat)
 		}
@@ -652,7 +653,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 
 	tableBuf := new(bytes.Buffer)
 
-	alignments := []tw.Align{
+	alignments := tw.Alignment{
 		tw.AlignRight,
 		tw.AlignRight,
 		tw.AlignRight,
@@ -724,7 +725,7 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 			Overwrite: true,
 		}),
 		tablewriter.WithHeaderAutoFormat(tw.Off),
-		tablewriter.WithAlignment(tw.Alignment(alignments)),
+		tablewriter.WithAlignment(alignments),
 		tablewriter.WithRowFilter(rowFilter),
 	)
 

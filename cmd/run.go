@@ -67,7 +67,7 @@ func runWithConfig(cmd *cobra.Command, args []string, config analyze.AnalyzerCon
 		} else {
 			analyzeFn()
 		}
-		analyzer.DirAnalyze(nil, config.SortBy, "")
+		analyzer.DirAnalyze(nil, config.SortBy)
 		if config.MemProfile != "" {
 			util.MemProfile(config.MemProfile, "allocs")
 		}
