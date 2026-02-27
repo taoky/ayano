@@ -55,7 +55,7 @@ func AdjacentPrefix(p netip.Prefix) netip.Prefix {
 func TruncateURLPath(input string) string {
 	parts := strings.SplitN(input, "?", 2)
 	path := filepath.Clean(parts[0])
-	if strings.HasSuffix(parts[0], "/") {
+	if strings.HasSuffix(parts[0], "/") && parts[0] != "/" {
 		// filepath.Clean removes trailing slash
 		// Add it back to preserve directory notation
 		path += "/"

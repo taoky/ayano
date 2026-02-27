@@ -22,6 +22,7 @@ func TestAdjacentPrefix(t *testing.T) {
 
 func TestTruncateURLPath(t *testing.T) {
 	testCases := [][2]string{
+		{"/", "/"},
 		{"/example/a/b/c/d/e/file.ext", "/example/.../file.ext"},
 		{"///example//merge/slashes///file.ext", "/example/.../file.ext"},
 		{"/example/a/b/c/d/e/dir/", "/example/.../dir/"},
@@ -42,6 +43,7 @@ func TestTruncateURLPathLen(t *testing.T) {
 		expected string
 	}
 	testCases := []testCase{
+		{"/", 3, "/"},
 		{"/example/a/b/c/d/e/file.ext", 30, "/example/.../file.ext"},
 		{"/example/a/b/c/d/e/dir/", 30, "/example/.../dir/"},
 		{"///example//merge/slashes///dir/", 30, "/example/.../dir/"},
