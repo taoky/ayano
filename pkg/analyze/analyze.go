@@ -156,6 +156,7 @@ type AnalyzerConfig struct {
 	RepeatWarn time.Duration
 	SortBy     SortByFlag
 	TopN       int
+	Total      bool
 	Truncate   bool
 	Truncate2  int
 	Whole      bool
@@ -180,6 +181,7 @@ func (c *AnalyzerConfig) InstallFlags(flags *pflag.FlagSet, cmdname string) {
 	flags.IntVarP(&c.RefreshSec, "refresh", "r", c.RefreshSec, "Refresh interval in seconds")
 	flags.VarP(&c.SortBy, "sort-by", "S", "Sort result by (size|requests)")
 	flags.IntVarP(&c.TopN, "top", "n", c.TopN, "Number of top items to show")
+	flags.BoolVar(&c.Total, "total", c.Total, "Show an additional \"Total\" row")
 	flags.BoolVar(&c.Truncate, "truncate", c.Truncate, "Truncate long URLs from output")
 	flags.IntVar(&c.Truncate2, "truncate-to", c.Truncate2, "Truncate URLs to given length, overrides --truncate")
 
@@ -651,6 +653,13 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		}
 	}
 
+	totalStats := IPStats{UAStore: make(map[UAKeyType]struct{})}
+	if a.Config.Total {
+		for _, stat := range a.stats {
+			totalStats = totalStats.MergeWith(stat)
+		}
+	}
+
 	tableBuf := new(bytes.Buffer)
 
 	alignments := tw.Alignment{
@@ -781,7 +790,23 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 		style.repeatedVisit = isRepeatedVisit
 
 		if err := table.Append(row); err != nil {
-			a.logger.Printf("failed to append top row: %v", err)
+			a.logger.Printf("failed to append row[%d]: %v", i, err)
+		}
+	}
+	if a.Config.Total {
+		total := totalStats.Size
+		reqTotal := totalStats.Requests
+		average := total / uint64(reqTotal)
+		agents := len(totalStats.UAStore)
+		row := []string{
+			"Total", "", humanize.IBytes(total), strconv.FormatUint(reqTotal, 10),
+			humanize.IBytes(average), "", "", "", strconv.Itoa(agents),
+		}
+		if !a.Config.NoNetstat {
+			row[1] = strconv.FormatInt(int64(len(activeConn)), 10)
+		}
+		if err := table.Append(row); err != nil {
+			a.logger.Printf("failed to append total row: %v", err)
 		}
 	}
 	if err := table.Render(); err != nil {
