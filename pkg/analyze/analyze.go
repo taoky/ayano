@@ -796,7 +796,10 @@ func (a *Analyzer) PrintTopValues(displayRecord map[netip.Prefix]time.Time, sort
 	if a.Config.Total {
 		total := totalStats.Size
 		reqTotal := totalStats.Requests
-		average := total / uint64(reqTotal)
+		average := uint64(0)
+		if reqTotal > 0 {
+			average = total / uint64(reqTotal)
+		}
 		agents := len(totalStats.UAStore)
 		row := []string{
 			"Total", "", humanize.IBytes(total), strconv.FormatUint(reqTotal, 10),
