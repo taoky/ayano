@@ -24,9 +24,9 @@ func init() {
 func ParseRsyncProxy(line []byte) (LogItem, error) {
 	fields := strings.Fields(string(line))
 	switch len(fields) {
-	case 9, 12, 14:
+	case 9, 10, 12, 14:
 	default:
-		return LogItem{}, fmt.Errorf("invalid format: expected 9, 12 or 14 fields, got %d", len(fields))
+		return LogItem{}, fmt.Errorf("invalid format: expected 9, 10, 12 or 14 fields, got %d", len(fields))
 	}
 
 	logTime, err := time.ParseInLocation(goLogTime, fields[0]+" "+fields[1], time.Local)
